@@ -1,0 +1,6 @@
+name: action/vm-factory
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

@@ -1,0 +1,6 @@
+name: action/tencent/tencent-vm
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

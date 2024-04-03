@@ -1,0 +1,6 @@
+name: type
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

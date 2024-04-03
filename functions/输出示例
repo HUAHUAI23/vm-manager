@@ -1,0 +1,87 @@
+{
+  "Response": {
+    "InstanceSet": [
+      {
+        "CPU": 2,
+        "CamRoleName": "",
+        "CreatedTime": "2024-04-02T08:33:01Z",
+        "DataDisks": [],
+        "DedicatedClusterId": "",
+        "DefaultLoginPort": 22,
+        "DefaultLoginUser": "ubuntu",
+        "DisableApiTermination": false,
+        "DisasterRecoverGroupId": "",
+        "ExpiredTime": null,
+        "GPUInfo": null,
+        "HpcClusterId": "",
+        "IPv6Addresses": null,
+        "ImageId": "img-487zeit5",
+        "InstanceChargeType": "POSTPAID_BY_HOUR",
+        "InstanceId": "ins-59x5hyea",
+        "InstanceName": "test-huahua",
+        "InstanceState": "RUNNING",
+        "InstanceType": "TS5.MEDIUM8",
+        "InternetAccessible": {
+          "BandwidthPackageId": null,
+          "InternetChargeType": "BANDWIDTH_POSTPAID_BY_HOUR",
+          "InternetMaxBandwidthOut": 1,
+          "PublicIpAssigned": null
+        },
+        "IsolatedSource": "NOTISOLATED",
+        "LatestOperation": null,
+        "LatestOperationErrorMsg": null,
+        "LatestOperationRequestId": null,
+        "LatestOperationState": null,
+        "LicenseType": "TencentCloud",
+        "LoginSettings": {
+          "KeepImageLogin": null,
+          "KeyIds": null,
+          "Password": null
+        },
+        "Memory": 8,
+        "OsName": "Ubuntu Server 22.04 LTS 64位",
+        "Placement": {
+          "HostId": null,
+          "HostIds": null,
+          "ProjectId": 1311479,
+          "Zone": "ap-guangzhou-6"
+        },
+        "PrivateIpAddresses": [
+          "172.16.32.12"
+        ],
+        "PublicIpAddresses": [
+          "106.53.217.62"
+        ],
+        "RdmaIpAddresses": null,
+        "RenewFlag": null,
+        "RestrictState": "NORMAL",
+        "SecurityGroupIds": [
+          "sg-jvxnr55b"
+        ],
+        "StopChargingMode": "NOT_APPLICABLE",
+        "SystemDisk": {
+          "CdcId": null,
+          "DiskId": "disk-r68kkrpg",
+          "DiskSize": 60,
+          "DiskType": "CLOUD_SSD"
+        },
+        "Tags": [
+          {
+            "Key": "sealos-user",
+            "Value": "testhuahua"
+          }
+        ],
+        "Uuid": "d15f5ce2-a943-446f-bb3b-5977f0c970ff",
+        "VirtualPrivateCloud": {
+          "AsVpcGateway": false,
+          "Ipv6AddressCount": null,
+          "PrivateIpAddresses": null,
+          "SubnetId": "subnet-643z86ds",
+          "VpcId": "vpc-oin9dr9h"
+        }
+      }
+    ],
+    "RequestId": "99621eaf-d627-400c-a074-6a45eb814f16",
+    "TotalCount": 1
+  }
+}

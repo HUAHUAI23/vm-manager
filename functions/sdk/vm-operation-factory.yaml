@@ -1,0 +1,6 @@
+name: sdk/vm-operation-factory
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

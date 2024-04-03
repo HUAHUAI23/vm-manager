@@ -1,0 +1,6 @@
+name: sdk/tencent/tencent-sdk
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

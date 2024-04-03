@@ -1,0 +1,6 @@
+version: 1.0.0
+name: vm-manager
+spec:
+  runtime: node
+  dependencies:
+    tencentcloud-sdk-nodejs: latest

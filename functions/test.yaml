@@ -1,0 +1,6 @@
+name: test
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

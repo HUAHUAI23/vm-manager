@@ -1,0 +1,6 @@
+name: action/get-vm-type
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

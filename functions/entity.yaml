@@ -1,0 +1,6 @@
+name: entity
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []
