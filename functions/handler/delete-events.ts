@@ -2,6 +2,7 @@ import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { VMTypes, getVmType } from "../type"
 import { createVmOperationFactory } from "../sdk/vm-operation-factory"
+import assert from "assert"
 
 export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -12,9 +13,7 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
             const cloudVmOperation = createVmOperationFactory(vmType)
             const VmState = await cloudVmOperation.vmStatus(vm.instanceId)
 
-            if (VmState !== 'STOPPED') {
-                throw new Error(`The instanceId ${vm.instanceId} is in ${VmState} and not in stopped, can not delete it`)
-            }
+            assert.strictEqual(VmState, 'STOPPED', `The instanceId ${vm.instanceId} is in ${VmState} and not in stopped, can not delete it`)
 
             const instanceDetails = await cloudVmOperation.getVmDetails(vm.instanceId)
 
@@ -30,6 +29,6 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
             break
 
         default:
-            break
+            throw new Error(`Unsupported VM type: ${vmType}`)
     }
 }

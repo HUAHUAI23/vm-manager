@@ -5,7 +5,7 @@ import { State, Phase } from './entity'
 import { ReconcileStateJob } from './utils'
 import { handlerCreateEvents } from './handler/create-events'
 import { handlerStartEvents } from './handler/start-events'
-import { handlerRestartEvents } from './handler/restart-events'
+import { handleRestartEvents } from './handler/restart-events'
 import { handlerStopEvents } from './handler/stop-events'
 import { handlerDeleteEvents } from './handler/delete-events'
 import { handlerChangeEvents } from './handler/change-events'
@@ -85,7 +85,7 @@ eventEmitter.on(EVENT_START, (vm: CloudVirtualMachine) => {
 })
 
 eventEmitter.on(EVENT_RESTART, (vm: CloudVirtualMachine) => {
-    handlerRestartEvents(vm)
+    handleRestartEvents(vm)
 })
 
 eventEmitter.on(EVENT_STOP, (vm: CloudVirtualMachine) => {

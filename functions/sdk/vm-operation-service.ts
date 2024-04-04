@@ -1,5 +1,3 @@
-import { TencentVmOperation } from "./tencent/tencent-sdk"
-
 export interface IVmOperation {
   create(params: any): Promise<any>
   start(params: any): Promise<any>
@@ -10,7 +8,6 @@ export interface IVmOperation {
   getVmDetails(params: any): Promise<any>
   vmStatus(params: any): Promise<any>
 }
-
 export class CloudVmOperation implements IVmOperation {
 
   vmOperation: IVmOperation

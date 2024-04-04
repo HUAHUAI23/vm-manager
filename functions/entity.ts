@@ -34,6 +34,13 @@ export const IntermediatePhases: Phase[] = [
   Phase.Deleting
 ]
 
+export enum ChangeType {
+  ChangePassword = 'ChangePassword',
+  ChangeNetwork = 'ChangeNetwork',
+  ChangeInstanceType = 'ChangeInstanceType',
+  ChangeDisk = 'ChangeDisk'
+}
+
 export class CloudVirtualMachine {
   _id?: ObjectId
   phase: Phase
@@ -45,6 +52,7 @@ export class CloudVirtualMachine {
   disk: number
   memory: number
   publicNetworkAccess: boolean
+  internetMaxBandwidthOut?: number
 
   privateIpAddresses?: string[]
   publicIpAddresses?: string[]
@@ -56,6 +64,7 @@ export class CloudVirtualMachine {
   loginPassword: string
   loginPort?: number
   cloudProvider: VMTypes
+  changeType?: ChangeType
   metaData: {
     [key: string]: any
   }

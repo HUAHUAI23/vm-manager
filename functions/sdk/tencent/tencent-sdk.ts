@@ -45,11 +45,22 @@ export class TencentVmOperation implements IVmOperation {
         await TencentVmOperation.client.StartInstances(params)
     }
 
-    async stop(params) {
-        console.log('TencentVmOperation stop', params)
+    async stop(id: string): Promise<void> {
+        const params = {
+            "InstanceIds": [
+                id,
+            ]
+        }
+        await TencentVmOperation.client.StopInstances(params)
     }
-    async restart(params) {
-        console.log('TencentVmOperation restart', params)
+
+    async restart(id: string): Promise<void> {
+        const params = {
+            "InstanceIds": [
+                id,
+            ]
+        }
+        await TencentVmOperation.client.RebootInstances(params)
     }
 
     async delete(id: string): Promise<void> {
@@ -66,10 +77,27 @@ export class TencentVmOperation implements IVmOperation {
     async change(params) {
         console.log('TencentVmOperation change', params)
     }
+
     async getVmDetails(id: string): Promise<Instance> {
         const params = {
             "InstanceIds": [
                 id,
+            ]
+        }
+        const res = await TencentVmOperation.client.DescribeInstances(params)
+        const instance: Instance = res.InstanceSet[0]
+        return instance
+    }
+
+    async getVmDetailsByInstanceName(instanceName: string): Promise<Instance> {
+        const params = {
+            "Filters": [
+                {
+                    "Name": "instance-name",
+                    "Values": [
+                        instanceName
+                    ]
+                }
             ]
         }
         const res = await TencentVmOperation.client.DescribeInstances(params)

@@ -1,8 +1,9 @@
-import { CloudVirtualMachine, Phase, State } from "../entity"
+import { CloudVirtualMachine, Phase } from "../entity"
 import { db } from "../db"
 import { VMTypes, getVmType } from "../type"
 import { createVmOperationFactory } from "../sdk/vm-operation-factory"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
+import assert from "assert"
 
 export async function handlerStartEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -22,10 +23,7 @@ export async function handlerStartEvents(vm: CloudVirtualMachine) {
                 return
             }
 
-            if (instanceDetails.InstanceState !== 'STOPPED') {
-                console.log(`The instanceId ${instanceDetails.InstanceId} is in ${instanceDetails.InstanceState} and not in stopped, can not start it`)
-                return
-            }
+            assert.strictEqual(instanceDetails.InstanceState, 'STOPPED', `The instanceId ${instanceDetails.InstanceId} is in ${instanceDetails.InstanceState} and not in stopped, can not start it`)
 
             await cloudVmOperation.start(vm.instanceId)
             break

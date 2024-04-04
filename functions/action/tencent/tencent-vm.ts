@@ -13,7 +13,8 @@ export class TencentVm implements IVM {
   async stop(params: any): Promise<void> {
     throw new Error("Method not implemented.")
   }
-  async restart(params: any): Promise<void> {
+  async restart(id: any): Promise<void> {
+
     throw new Error("Method not implemented.")
   }
   async delete(vm: CloudVirtualMachine): Promise<void> {
