@@ -1,6 +1,6 @@
-name: action/get-vm-type
+name: handler/delete-events
 desc: ""
 methods:
-  - GET
   - POST
 tags: []
+

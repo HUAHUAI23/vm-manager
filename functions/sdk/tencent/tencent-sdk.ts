@@ -116,7 +116,7 @@ export class TencentVmOperation implements IVmOperation {
         return state
     }
 
-    async getInstanceTypeList(): Promise<InstanceTypeConfig[]> {
+    async getInstanceTypeDetailList(): Promise<InstanceTypeConfig[]> {
         const params = {
             Filters: [
                 {
@@ -136,7 +136,25 @@ export class TencentVmOperation implements IVmOperation {
         const InstanceTypeList = res.InstanceTypeConfigSet
 
         return InstanceTypeList
-
     }
-
+    async getInstanceTypeDetails(instanceType: string): Promise<InstanceTypeConfig> {
+        const params = {
+            Filters: [
+                {
+                    Name: "zone",
+                    Values: ["ap-guangzhou-6"],
+                },
+                {
+                    Name: "instance-family",
+                    Values: ["TS5"],
+                },
+                {
+                    Name: "instance-type",
+                    Values: [instanceType],
+                }
+            ],
+        }
+        const res = await TencentVmOperation.client.DescribeInstanceTypeConfigs(params)
+        return res.InstanceTypeConfigSet[0]
+    }
 }

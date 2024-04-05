@@ -1,6 +1,6 @@
 
 import { ObjectId } from 'mongodb'
-import { VMTypes } from './type'
+import { VmVendors } from './type'
 import { DataDisk, SystemDisk } from 'tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models'
 
 export enum Phase {
@@ -49,8 +49,9 @@ export class CloudVirtualMachine {
   sealosUserId: string
 
   cpu: number
-  disk: number
   memory: number
+  gpu?: number
+  disk: number
   publicNetworkAccess: boolean
   internetMaxBandwidthOut?: number
 
@@ -60,10 +61,10 @@ export class CloudVirtualMachine {
   instanceId?: string
   imageId: string
   instanceName: string
-  loginName: string
+  loginName?: string
   loginPassword: string
   loginPort?: number
-  cloudProvider: VMTypes
+  cloudProvider: VmVendors
   changeType?: ChangeType
   metaData: {
     [key: string]: any

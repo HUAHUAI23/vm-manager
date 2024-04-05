@@ -1,4 +1,4 @@
-name: action/vm
+name: reconcile
 desc: ""
 methods:
   - POST

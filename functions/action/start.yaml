@@ -1,4 +1,4 @@
-name: action/vm
+name: action/start
 desc: ""
 methods:
   - POST

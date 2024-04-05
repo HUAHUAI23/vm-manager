@@ -1,15 +1,15 @@
 import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
-import { VMTypes, getVmType } from "../type"
+import { VmVendors, getVmVendor } from "../type"
 import { createVmOperationFactory } from "../sdk/vm-operation-factory"
 import assert from "assert"
 
 export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
-    const vmType: VMTypes = getVmType(vendor)
+    const vmType: VmVendors = getVmVendor(vendor)
     switch (vmType) {
-        case VMTypes.Tencent:
+        case VmVendors.Tencent:
             const cloudVmOperation = createVmOperationFactory(vmType)
             const VmState = await cloudVmOperation.vmStatus(vm.instanceId)
 

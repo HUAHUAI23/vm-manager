@@ -1,12 +1,12 @@
-import { VMTypes } from "../type"
+import { VmVendors } from "../type"
 import { TencentVmOperation } from "./tencent/tencent-sdk"
 import { CloudVmOperation, IVmOperation } from "./vm-operation-service"
 
-export function createVmOperationFactory(vmType: VMTypes): CloudVmOperation {
+export function createVmOperationFactory(vmType: VmVendors): CloudVmOperation {
     let vmOperation: IVmOperation
 
     switch (vmType) {
-        case VMTypes.Tencent:
+        case VmVendors.Tencent:
             vmOperation = new TencentVmOperation()
             break
         default:

@@ -1,4 +1,4 @@
-name: action/create
+name: handler/change-events
 desc: ""
 methods:
   - POST

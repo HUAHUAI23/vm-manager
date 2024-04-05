@@ -1,6 +1,5 @@
-name: action/get-image-os
+name: handler/create-events
 desc: ""
 methods:
-  - GET
   - POST
 tags: []

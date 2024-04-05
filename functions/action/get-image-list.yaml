@@ -1,4 +1,4 @@
-name: action/create
+name: action/get-image-list
 desc: ""
 methods:
   - POST

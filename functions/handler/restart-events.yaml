@@ -1,0 +1,5 @@
+name: handler/restart-events
+desc: ""
+methods:
+  - POST
+tags: []

@@ -52,8 +52,8 @@ async function create() {
     },
     "InternetAccessible": {
       "InternetChargeType": "BANDWIDTH_POSTPAID_BY_HOUR",
-      "InternetMaxBandwidthOut": 1,
-      "PublicIpAssigned": true
+      "InternetMaxBandwidthOut": 0,
+      "PublicIpAssigned": false
     },
     "InstanceName": "test-huahua22",
     "LoginSettings": {

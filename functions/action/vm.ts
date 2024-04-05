@@ -21,13 +21,13 @@ export class CloudVm implements IVM {
   }
 
   async start(params: CloudVirtualMachine): Promise<any> {
-    await this.vm.create(params)
+    await this.vm.start(params)
   }
   async stop(params: CloudVirtualMachine): Promise<any> {
-    await this.vm.create(params)
+    await this.vm.stop(params)
   }
   async restart(params: CloudVirtualMachine): Promise<any> {
-    await this.vm.create(params)
+    await this.vm.restart(params)
   }
   async delete(params: any): Promise<any> {
     await this.vm.delete(params)

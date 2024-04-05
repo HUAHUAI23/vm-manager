@@ -4,3 +4,4 @@ spec:
   runtime: node
   dependencies:
     tencentcloud-sdk-nodejs: latest
+    nanoid: latest

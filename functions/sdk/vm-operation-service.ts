@@ -21,7 +21,7 @@ export class CloudVmOperation implements IVmOperation {
   }
 
   async start(params: any): Promise<any> {
-    await this.vmOperation.create(params)
+    await this.vmOperation.start(params)
   }
 
   async stop(params: any): Promise<any> {

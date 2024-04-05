@@ -1,42 +1,93 @@
 import { IVM } from "../vm"
 import { db } from '../../db'
 import { IntermediatePhases, IntermediateStates, State, CloudVirtualMachine, Phase, TencentCloudVirtualMachine } from "../../entity"
+import assert from "assert"
 
 export class TencentVm implements IVM {
   async create(vm: TencentCloudVirtualMachine): Promise<void> {
-    db.collection<CloudVirtualMachine>('CloudVirtualMachine').insertOne(vm)
+    await db.collection<CloudVirtualMachine>('CloudVirtualMachine').insertOne(vm)
   }
 
-  async start(params: any): Promise<void> {
-    throw new Error("Method not implemented.")
-  }
-  async stop(params: any): Promise<void> {
-    throw new Error("Method not implemented.")
-  }
-  async restart(id: any): Promise<void> {
-
-    throw new Error("Method not implemented.")
-  }
-  async delete(vm: CloudVirtualMachine): Promise<void> {
+  async start(tencentVm: TencentCloudVirtualMachine): Promise<void> {
     // 检查状态是否为中间态
-    if (IntermediateStates.includes(vm.state)) {
-      throw new Error(`The virtual machine is in an ${vm.state} state and cannot be deleted.`)
-    }
+    assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
+      `The virtual machine is in an ${tencentVm.state} state and cannot be start.`)
 
-    if (IntermediatePhases.includes(vm.phase)) {
-      throw new Error(`The virtual machine is in an ${vm.phase} state and cannot be deleted.`)
-    }
+    assert.strictEqual(IntermediatePhases.includes(tencentVm.phase), false,
+      `The virtual machine is in an ${tencentVm.phase} state and cannot be start.`)
 
     // 检查 phase 是否为 Stopped
-    if (vm.phase !== Phase.Stopped) {
-      throw new Error('The virtual machine is not stopped and cannot be deleted.')
-    }
+    assert.strictEqual(tencentVm.phase, Phase.Stopped, 'The virtual machine is not stopped and cannot be start.')
 
-    db.collection<CloudVirtualMachine>('CloudVirtual').updateOne(
-      { id: vm._id },
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
+      { id: tencentVm._id },
       {
         $set: {
-          status: State.Deleted
+          state: State.Running,
+          phase: Phase.Starting
+        }
+      })
+  }
+
+  async stop(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+    // 检查状态是否为中间态
+    assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
+      `The virtual machine is in an ${tencentVm.state} state and cannot be stop.`)
+
+    assert.strictEqual(IntermediatePhases.includes(tencentVm.phase), false,
+      `The virtual machine is in an ${tencentVm.phase} state and cannot be stop.`)
+
+    // 检查 phase 是否为 Started
+    assert.strictEqual(tencentVm.phase, Phase.Started, 'The virtual machine is not started and cannot be stop.')
+
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
+      { id: tencentVm._id },
+      {
+        $set: {
+          state: State.Stopped,
+          phase: Phase.Stopping
+        }
+      })
+  }
+
+  async restart(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+    // 检查状态是否为中间态
+    assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
+      `The virtual machine is in an ${tencentVm.state} state and cannot be restart.`)
+
+    assert.strictEqual(IntermediatePhases.includes(tencentVm.phase), false,
+      `The virtual machine is in an ${tencentVm.phase} state and cannot be restart.`)
+
+    // 检查 phase 是否为 Started
+    assert.strictEqual(tencentVm.phase, Phase.Started, 'The virtual machine is not started and cannot be restart.')
+
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
+      { id: tencentVm._id },
+      {
+        $set: {
+          state: State.Restarting,
+          phase: Phase.Started
+        }
+      })
+  }
+
+  async delete(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+    // 检查状态是否为中间态
+    assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
+      `The virtual machine is in an ${tencentVm.state} state and cannot be deleted.`)
+
+    assert.strictEqual(IntermediatePhases.includes(tencentVm.phase), false,
+      `The virtual machine is in an ${tencentVm.phase} state and cannot be deleted.`)
+
+    // 检查 phase 是否为 Stopped
+    assert.strictEqual(tencentVm.phase, Phase.Stopped, 'The virtual machine is not stopped and cannot be deleted.')
+
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
+      { id: tencentVm._id },
+      {
+        $set: {
+          state: State.Deleted,
+          phase: Phase.Deleting
         }
       })
   }

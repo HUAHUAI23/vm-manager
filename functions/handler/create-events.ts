@@ -1,4 +1,4 @@
-import { VMTypes, getVmType } from "../type"
+import { VmVendors, getVmVendor } from "../type"
 import { CloudVirtualMachine, Phase, TencentMeta } from "../entity"
 import { createVmOperationFactory } from "../sdk/vm-operation-factory"
 import { db } from "../db"
@@ -8,11 +8,11 @@ import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 export async function handlerCreateEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
-    const vmType: VMTypes = getVmType(vendor)
+    const vendorType: VmVendors = getVmVendor(vendor)
 
-    switch (vmType) {
-        case VMTypes.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vmType)
+    switch (vendorType) {
+        case VmVendors.Tencent:
+            const cloudVmOperation = createVmOperationFactory(vendorType)
 
             const found = await (<TencentVmOperation>cloudVmOperation.vmOperation).getVmDetailsByInstanceName(vm.instanceName)
 
@@ -53,6 +53,6 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
             break
 
         default:
-            throw new Error(`Unsupported VM type: ${vmType}`)
+            throw new Error(`Unsupported VM type: ${vendorType}`)
     }
 }
