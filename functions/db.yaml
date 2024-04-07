@@ -1,6 +1,4 @@
 name: db
 desc: ""
-methods:
-  - GET
-  - POST
+methods: []
 tags: []

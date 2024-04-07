@@ -1,0 +1,5 @@
+name: action/get-virtual-machine-detail
+desc: ""
+methods:
+  - POST
+tags: []

@@ -1,5 +1,4 @@
 name: handler/restart-events
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

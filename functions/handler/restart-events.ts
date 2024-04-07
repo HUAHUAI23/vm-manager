@@ -7,10 +7,10 @@ import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v201
 export async function handleRestartEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
-    const vmType: VmVendors = getVmVendor(vendor)
-    switch (vmType) {
+    const vendorType: VmVendors = getVmVendor(vendor)
+    switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vmType)
+            const cloudVmOperation = createVmOperationFactory(vendorType)
 
             const vmStatus = await cloudVmOperation.vmStatus(vm.instanceId)
 
@@ -30,15 +30,24 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
 
             instanceDetails = await cloudVmOperation.getVmDetails(vm.instanceId)
 
-            if (instanceDetails.LatestOperation === 'RebootInstances' && instanceDetails.LatestOperationState === 'SUCCESS') {
-                await collection.updateOne({ _id: vm._id }, { $set: { state: State.Running, phase: Phase.Started } })
+            if (instanceDetails.LatestOperation === 'RebootInstances'
+                && instanceDetails.LatestOperationState === 'SUCCESS') {
+                await collection.updateOne({ _id: vm._id },
+                    {
+                        $set:
+                        {
+                            state: State.Running,
+                            phase: Phase.Started,
+                            updateTime: new Date()
+                        }
+                    })
                 return
             }
 
             break
 
         default:
-            throw new Error(`Unsupported VM type: ${vmType}`)
+            throw new Error(`Unsupported VM type: ${vendorType}`)
     }
 
 

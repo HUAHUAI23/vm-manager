@@ -24,7 +24,8 @@ export class TencentVm implements IVM {
       {
         $set: {
           state: State.Running,
-          phase: Phase.Starting
+          phase: Phase.Starting,
+          updateTime: new Date()
         }
       })
   }
@@ -45,7 +46,8 @@ export class TencentVm implements IVM {
       {
         $set: {
           state: State.Stopped,
-          phase: Phase.Stopping
+          phase: Phase.Stopping,
+          updateTime: new Date()
         }
       })
   }
@@ -66,7 +68,8 @@ export class TencentVm implements IVM {
       {
         $set: {
           state: State.Restarting,
-          phase: Phase.Started
+          phase: Phase.Started,
+          updateTime: new Date()
         }
       })
   }
@@ -87,7 +90,8 @@ export class TencentVm implements IVM {
       {
         $set: {
           state: State.Deleted,
-          phase: Phase.Deleting
+          phase: Phase.Deleting,
+          updateTime: new Date()
         }
       })
   }

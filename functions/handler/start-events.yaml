@@ -1,5 +1,4 @@
 name: handler/start-events
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

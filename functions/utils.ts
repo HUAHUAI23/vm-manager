@@ -39,7 +39,7 @@ export function validateDTO(dto, schema) {
     return true
 }
 
-export const ReconcileStateJob = Cron("*/2 * * * * *", {
+export const ReconcileStateJob =  Cron("*/2 * * * * *", {
     catch: true,
     paused: true,
     unref: true,                  // 允许进程在定时器运行时退出（Node.js 和 Deno 环境）

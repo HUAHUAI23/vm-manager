@@ -22,7 +22,14 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
             }
 
             if (!vm.instanceId) {
-                await collection.updateOne({ _id: vm._id }, { $set: { instanceId: found.InstanceId } })
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            instanceId: found.InstanceId,
+                            updateTime: new Date()
+                        }
+                    })
                 return
             }
 
@@ -45,7 +52,8 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                 await collection.updateOne({ _id: vm._id }, {
                     $set: {
                         metaData,
-                        phase: Phase.Started
+                        phase: Phase.Started,
+                        updateTime: new Date()
                     }
                 })
             }

@@ -1,6 +1,4 @@
 name: type
 desc: ""
-methods:
-  - GET
-  - POST
+methods: []
 tags: []

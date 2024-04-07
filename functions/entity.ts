@@ -64,8 +64,13 @@ export class CloudVirtualMachine {
   loginName?: string
   loginPassword: string
   loginPort?: number
+
   cloudProvider: VmVendors
   changeType?: ChangeType
+  // 创建时间
+  createTime: Date
+  // 状态变更时，该时间会发生变化
+  updateTime: Date
   metaData: {
     [key: string]: any
   }
@@ -107,25 +112,4 @@ export interface TencentMeta {
 
 export class TencentCloudVirtualMachine extends CloudVirtualMachine {
   declare metaData: TencentMeta
-}
-
-const test = {
-  'InstanceType': 'S2.SMALL1',
-  "ImageId": "img-487zeit5",
-  "SystemDisk": {
-    "DiskSize": 30
-  },
-  "DataDisks": [
-    {
-      "DiskSize": 30,
-    }
-  ],
-  "InternetAccessible": {
-    "InternetChargeType": "BANDWIDTH_POSTPAID_BY_HOUR",
-    "InternetMaxBandwidthOut": 1,
-  },
-  "LoginSettings": {
-    "Password": "Testhuahua."
-  },
-  "cloudProvider": "tencent"
 }

@@ -1,5 +1,4 @@
 name: handler/change-events
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

@@ -1,5 +1,4 @@
 name: sdk/vm-operation-factory
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

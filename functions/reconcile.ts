@@ -9,6 +9,7 @@ import { handleRestartEvents } from './handler/restart-events'
 import { handlerStopEvents } from './handler/stop-events'
 import { handlerDeleteEvents } from './handler/delete-events'
 import { handlerChangeEvents } from './handler/change-events'
+import { Cron } from "croner"
 
 // 创建事件发射器
 const eventEmitter = new EventEmitter()
@@ -67,7 +68,7 @@ async function reconcileState() {
     }
 }
 
-const reconcileStateJob = ReconcileStateJob
+const reconcileStateJob: Cron = ReconcileStateJob
 reconcileStateJob.schedule(() => {
     reconcileState() // 调用 reconcileState() 函数
 })
@@ -99,3 +100,5 @@ eventEmitter.on(EVENT_DELETE, (vm: CloudVirtualMachine) => {
 eventEmitter.on(EVENT_CHANGE, (vm: CloudVirtualMachine) => {
     handlerChangeEvents(vm)
 })
+
+export const reconcile = { eventEmitter: eventEmitter, reconcileStateJob: reconcileStateJob } 

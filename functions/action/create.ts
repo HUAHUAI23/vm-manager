@@ -65,6 +65,8 @@ export default async function (ctx: FunctionContext) {
                 instanceName: instanceName,
                 loginPassword: body.loginPassword,
                 cloudProvider: VmVendors.Tencent,
+                createTime: new Date(),
+                updateTime: new Date(),
                 metaData: {
                     InstanceChargeType: 'POSTPAID_BY_HOUR',
                     Placement: {

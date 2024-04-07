@@ -1,5 +1,4 @@
 name: sdk/tencent/tencent-sdk
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

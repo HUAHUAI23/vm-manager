@@ -1,5 +1,4 @@
 name: sdk/vm-operation-service
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

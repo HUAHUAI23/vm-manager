@@ -1,6 +1,4 @@
 name: handler/delete-events
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []
-

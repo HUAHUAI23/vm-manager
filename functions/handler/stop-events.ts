@@ -8,10 +8,10 @@ import assert from "assert"
 export async function handlerStopEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
-    const vmType: VmVendors = getVmVendor(vendor)
-    switch (vmType) {
+    const vendorType: VmVendors = getVmVendor(vendor)
+    switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vmType)
+            const cloudVmOperation = createVmOperationFactory(vendorType)
             const instanceDetails: Instance = await cloudVmOperation.getVmDetails(vm.instanceId)
 
             if (!instanceDetails) {
@@ -19,7 +19,14 @@ export async function handlerStopEvents(vm: CloudVirtualMachine) {
             }
 
             if (instanceDetails.InstanceState === 'STOPPED') {
-                await collection.updateOne({ _id: vm._id }, { $set: { phase: Phase.Stopped } })
+                await collection.updateOne({ _id: vm._id },
+                    {
+                        $set: {
+                            phase: Phase.Stopped,
+                            updateTime: new Date()
+                        }
+                    })
+
                 return
             }
 
@@ -29,6 +36,6 @@ export async function handlerStopEvents(vm: CloudVirtualMachine) {
             break
 
         default:
-            throw new Error(`Unsupported VM type: ${vmType}`)
+            throw new Error(`Unsupported VM type: ${vendorType}`)
     }
 }

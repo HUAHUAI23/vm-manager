@@ -5,3 +5,4 @@ spec:
   dependencies:
     tencentcloud-sdk-nodejs: latest
     nanoid: latest
+    croner: latest

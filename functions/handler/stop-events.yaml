@@ -1,5 +1,4 @@
 name: handler/stop-events
 desc: ""
-methods:
-  - POST
+methods: []
 tags: []

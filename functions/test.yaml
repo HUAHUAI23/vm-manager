@@ -1,6 +1,4 @@
 name: test
 desc: ""
-methods:
-  - GET
-  - POST
+methods: []
 tags: []
