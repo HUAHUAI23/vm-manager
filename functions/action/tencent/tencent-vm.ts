@@ -1,14 +1,13 @@
-import { IVM } from "../vm"
 import { db } from '../../db'
 import { IntermediatePhases, IntermediateStates, State, CloudVirtualMachine, Phase, TencentCloudVirtualMachine } from "../../entity"
 import assert from "assert"
 
-export class TencentVm implements IVM {
-  async create(vm: TencentCloudVirtualMachine): Promise<void> {
+export class TencentVm {
+  static async create(vm: TencentCloudVirtualMachine): Promise<void> {
     await db.collection<CloudVirtualMachine>('CloudVirtualMachine').insertOne(vm)
   }
 
-  async start(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+  static async start(tencentVm: TencentCloudVirtualMachine): Promise<void> {
     // 检查状态是否为中间态
     assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
       `The virtual machine is in an ${tencentVm.state} state and cannot be start.`)
@@ -19,8 +18,8 @@ export class TencentVm implements IVM {
     // 检查 phase 是否为 Stopped
     assert.strictEqual(tencentVm.phase, Phase.Stopped, 'The virtual machine is not stopped and cannot be start.')
 
-    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
-      { id: tencentVm._id },
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine').updateOne(
+      { _id: tencentVm._id },
       {
         $set: {
           state: State.Running,
@@ -30,7 +29,7 @@ export class TencentVm implements IVM {
       })
   }
 
-  async stop(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+  static async stop(tencentVm: TencentCloudVirtualMachine): Promise<void> {
     // 检查状态是否为中间态
     assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
       `The virtual machine is in an ${tencentVm.state} state and cannot be stop.`)
@@ -41,8 +40,8 @@ export class TencentVm implements IVM {
     // 检查 phase 是否为 Started
     assert.strictEqual(tencentVm.phase, Phase.Started, 'The virtual machine is not started and cannot be stop.')
 
-    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
-      { id: tencentVm._id },
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine').updateOne(
+      { _id: tencentVm._id },
       {
         $set: {
           state: State.Stopped,
@@ -52,7 +51,7 @@ export class TencentVm implements IVM {
       })
   }
 
-  async restart(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+  static async restart(tencentVm: TencentCloudVirtualMachine): Promise<void> {
     // 检查状态是否为中间态
     assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
       `The virtual machine is in an ${tencentVm.state} state and cannot be restart.`)
@@ -63,8 +62,8 @@ export class TencentVm implements IVM {
     // 检查 phase 是否为 Started
     assert.strictEqual(tencentVm.phase, Phase.Started, 'The virtual machine is not started and cannot be restart.')
 
-    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
-      { id: tencentVm._id },
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine').updateOne(
+      { _id: tencentVm._id },
       {
         $set: {
           state: State.Restarting,
@@ -74,7 +73,7 @@ export class TencentVm implements IVM {
       })
   }
 
-  async delete(tencentVm: TencentCloudVirtualMachine): Promise<void> {
+  static async delete(tencentVm: TencentCloudVirtualMachine): Promise<void> {
     // 检查状态是否为中间态
     assert.strictEqual(IntermediateStates.includes(tencentVm.state), false,
       `The virtual machine is in an ${tencentVm.state} state and cannot be deleted.`)
@@ -85,8 +84,8 @@ export class TencentVm implements IVM {
     // 检查 phase 是否为 Stopped
     assert.strictEqual(tencentVm.phase, Phase.Stopped, 'The virtual machine is not stopped and cannot be deleted.')
 
-    await db.collection<TencentCloudVirtualMachine>('CloudVirtual').updateOne(
-      { id: tencentVm._id },
+    await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine').updateOne(
+      { _id: tencentVm._id },
       {
         $set: {
           state: State.Deleted,
@@ -98,7 +97,10 @@ export class TencentVm implements IVM {
 
 
 
-  async change(params: any): Promise<void> {
+  static async change(params: any): Promise<void> {
+    // 变更套餐需要在关机状态下进行
+
+    // 扩容磁盘需要在开机状态下进行
     throw new Error("Method not implemented.")
   }
 }

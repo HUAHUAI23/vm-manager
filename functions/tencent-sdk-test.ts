@@ -81,7 +81,7 @@ async function create() {
     }
   )
 }
-async function InquiryPriceRunInstances(){
+async function InquiryPriceRunInstances() {
   const params = {
     "InstanceChargeType": "POSTPAID_BY_HOUR",
     "Placement": {
@@ -129,12 +129,12 @@ async function InquiryPriceRunInstances(){
   }
   client.InquiryPriceRunInstances(params).then(
     (data) => {
-      console.log(JSON.stringify(data,null,2));
+      console.log(JSON.stringify(data, null, 2))
     },
     (err) => {
-      console.error("error", err);
+      console.error("error", err)
     }
-  );
+  )
 
 }
 
@@ -165,12 +165,47 @@ async function describeInstanceTypeConfigs() {
   }
   client.DescribeInstanceTypeConfigs(params).then(
     (data) => {
-      console.log(data)
+      console.log(data.InstanceTypeConfigSet.length)
+
     },
     (err) => {
       console.error("error", err)
     }
   )
+}
+
+async function DescribeZoneInstanceConfigInfos() {
+  const params = {
+    "Filters": [
+      {
+        "Name": "zone",
+        "Values": [
+          "ap-guangzhou-6"
+        ]
+      },
+      {
+        "Name": "instance-family",
+        "Values": [
+          "TS5"
+        ]
+      },
+      {
+        "Name": "instance-charge-type",
+        "Values": [
+          "POSTPAID_BY_HOUR"
+        ]
+      }
+    ]
+  }
+  client.DescribeZoneInstanceConfigInfos(params).then(
+    (data) => {
+      console.log(data.InstanceTypeQuotaSet.length)
+    },
+    (err) => {
+      console.error("error", err)
+    }
+  )
+
 }
 
 async function DescribeInstances() {
@@ -183,7 +218,7 @@ async function DescribeInstances() {
   // InstanceType
   client.DescribeInstances(params).then(
     (data) => {
-      console.log(JSON.stringify(data,null,2))
+      console.log(JSON.stringify(data, null, 2))
     },
     (err) => {
       console.error("error", err)
@@ -247,7 +282,7 @@ async function DescribeInstancesStatus() {
   }
   client.DescribeInstancesStatus(params).then(
     (data) => {
-      console.log(JSON.stringify(data,null,2))
+      console.log(JSON.stringify(data, null, 2))
     },
     (err) => {
       console.error("error", err)

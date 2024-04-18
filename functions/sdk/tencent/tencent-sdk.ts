@@ -1,6 +1,5 @@
 
-import { Instance, InstanceTypeConfig } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
-import { IVmOperation } from "../vm-operation-service"
+import { Instance, InstanceTypeConfig, InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 import * as tencentcloud from "tencentcloud-sdk-nodejs"
 
 // 导入对应产品模块的client models。
@@ -27,16 +26,16 @@ const client = new CvmClient({
     },
 })
 
-export class TencentVmOperation implements IVmOperation {
+export class TencentVmOperation {
     private static client = client
 
-    async create(params): Promise<string> {
+    static async create(params): Promise<string> {
         const res = await client.RunInstances(params)
         const instanceId = res.InstanceIdSet[0]
         return instanceId
     }
 
-    async start(id: string): Promise<void> {
+    static async start(id: string): Promise<void> {
         const params = {
             "InstanceIds": [
                 id,
@@ -45,16 +44,18 @@ export class TencentVmOperation implements IVmOperation {
         await TencentVmOperation.client.StartInstances(params)
     }
 
-    async stop(id: string): Promise<void> {
+    static async stop(id: string): Promise<void> {
         const params = {
             "InstanceIds": [
                 id,
-            ]
+            ],
+            "StopType": "SOFT_FIRST",
+            "StoppedMode": "STOP_CHARGING"
         }
         await TencentVmOperation.client.StopInstances(params)
     }
 
-    async restart(id: string): Promise<void> {
+    static async restart(id: string): Promise<void> {
         const params = {
             "InstanceIds": [
                 id,
@@ -63,22 +64,22 @@ export class TencentVmOperation implements IVmOperation {
         await TencentVmOperation.client.RebootInstances(params)
     }
 
-    async delete(id: string): Promise<void> {
+    static async delete(id: string): Promise<void> {
         const params = {
             "InstanceIds": [
                 id,
             ],
-            // 释放包年包月
+            // 释放包年包月 磁盘
             "ReleasePrepaidDataDisks": true
         }
         await TencentVmOperation.client.TerminateInstances(params)
     }
 
-    async change(params) {
+    static async change(params) {
         console.log('TencentVmOperation change', params)
     }
 
-    async getVmDetails(id: string): Promise<Instance> {
+    static async getVmDetails(id: string): Promise<Instance> {
         const params = {
             "InstanceIds": [
                 id,
@@ -89,7 +90,7 @@ export class TencentVmOperation implements IVmOperation {
         return instance
     }
 
-    async getVmDetailsByInstanceName(instanceName: string): Promise<Instance> {
+    static async getVmDetailsByInstanceName(instanceName: string): Promise<Instance> {
         const params = {
             "Filters": [
                 {
@@ -105,7 +106,23 @@ export class TencentVmOperation implements IVmOperation {
         return instance
     }
 
-    async vmStatus(id: string): Promise<string> {
+    static async getVmDetailsListByInstanceName(instanceName: string): Promise<Instance[]> {
+        const params = {
+            "Filters": [
+                {
+                    "Name": "instance-name",
+                    "Values": [
+                        instanceName
+                    ]
+                }
+            ]
+        }
+        const res = await TencentVmOperation.client.DescribeInstances(params)
+        const instanceList: Instance[] = res.InstanceSet
+        return instanceList
+    }
+
+    static async vmStatus(id: string): Promise<string> {
         const params = {
             "InstanceIds": [
                 id,
@@ -116,7 +133,7 @@ export class TencentVmOperation implements IVmOperation {
         return state
     }
 
-    async getInstanceTypeDetailList(): Promise<InstanceTypeConfig[]> {
+    static async getInstanceTypeDetailList(): Promise<InstanceTypeConfig[]> {
         const params = {
             Filters: [
                 {
@@ -137,7 +154,7 @@ export class TencentVmOperation implements IVmOperation {
 
         return InstanceTypeList
     }
-    async getInstanceTypeDetails(instanceType: string): Promise<InstanceTypeConfig> {
+    static async getInstanceTypeDetails(instanceType: string): Promise<InstanceTypeConfig> {
         const params = {
             Filters: [
                 {
@@ -157,4 +174,64 @@ export class TencentVmOperation implements IVmOperation {
         const res = await TencentVmOperation.client.DescribeInstanceTypeConfigs(params)
         return res.InstanceTypeConfigSet[0]
     }
+    static async describeZoneInstanceConfigInfo(instanceType: string): Promise<InstanceTypeQuotaItem> {
+        const params = {
+            "Filters": [
+                {
+                    "Name": "zone",
+                    "Values": [
+                        "ap-guangzhou-6"
+                    ]
+                },
+                {
+                    "Name": "instance-family",
+                    "Values": [
+                        "TS5"
+                    ]
+                },
+                {
+                    "Name": "instance-type",
+                    "Values": [
+                        instanceType
+                    ]
+                },
+                {
+                    "Name": "instance-charge-type",
+                    "Values": [
+                        "POSTPAID_BY_HOUR"
+                    ]
+                }
+            ]
+        }
+        const res = await TencentVmOperation.client.DescribeZoneInstanceConfigInfos(params)
+        return res.InstanceTypeQuotaSet[0]
+    }
+
+    static async describeZoneInstanceConfigInfos(): Promise<InstanceTypeQuotaItem[]> {
+        const params = {
+            "Filters": [
+                {
+                    "Name": "zone",
+                    "Values": [
+                        "ap-guangzhou-6"
+                    ]
+                },
+                {
+                    "Name": "instance-family",
+                    "Values": [
+                        "TS5"
+                    ]
+                },
+                {
+                    "Name": "instance-charge-type",
+                    "Values": [
+                        "POSTPAID_BY_HOUR"
+                    ]
+                }
+            ]
+        }
+        const res = await TencentVmOperation.client.DescribeZoneInstanceConfigInfos(params)
+        return res.InstanceTypeQuotaSet
+    }
+
 }

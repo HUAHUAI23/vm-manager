@@ -1,8 +1,8 @@
-import { CloudVirtualMachine, Phase } from "../entity"
+import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { VmVendors, getVmVendor } from "../type"
-import { createVmOperationFactory } from "../sdk/vm-operation-factory"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
+import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 import assert from "assert"
 
 export async function handlerStartEvents(vm: CloudVirtualMachine) {
@@ -11,28 +11,31 @@ export async function handlerStartEvents(vm: CloudVirtualMachine) {
     const vendorType: VmVendors = getVmVendor(vendor)
     switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vendorType)
-            const instanceDetails: Instance = await cloudVmOperation.getVmDetails(vm.instanceId)
 
+            console.log(111)
+
+            const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
             if (!instanceDetails) {
                 throw new Error(`The instanceId ${vm.instanceId} not found in Tencent, can not start it`)
             }
 
-            if (instanceDetails.InstanceState === 'RUNNING') {
-                await collection.updateOne({ _id: vm._id },
-                    {
-                        $set: {
-                            phase: Phase.Started,
-                            updateTime: new Date()
-                        }
-                    })
+            if (instanceDetails.LatestOperation !== 'StartInstances' || instanceDetails.LatestOperationState === 'FAILED') {
+                console.log(333)
+                await TencentVmOperation.start(vm.instanceId)
+            }
 
+            if (instanceDetails.InstanceState !== 'RUNNING') {
                 return
             }
 
-            assert.strictEqual(instanceDetails.InstanceState, 'STOPPED', `The instanceId ${instanceDetails.InstanceId} is in ${instanceDetails.InstanceState} and not in stopped, can not start it`)
+            await collection.updateOne({ _id: vm._id },
+                {
+                    $set: {
+                        phase: Phase.Started,
+                        updateTime: new Date()
+                    }
+                })
 
-            await cloudVmOperation.start(vm.instanceId)
             break
 
         default:

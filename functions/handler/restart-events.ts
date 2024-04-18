@@ -1,8 +1,8 @@
 import { VmVendors, getVmVendor } from "../type"
 import { db } from "../db"
 import { CloudVirtualMachine, Phase, State } from "../entity"
-import { createVmOperationFactory } from "../sdk/vm-operation-factory"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
+import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 
 export async function handleRestartEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -10,45 +10,37 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
     const vendorType: VmVendors = getVmVendor(vendor)
     switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vendorType)
 
-            const vmStatus = await cloudVmOperation.vmStatus(vm.instanceId)
+            console.log(111)
 
-            if (vmStatus !== 'RUNNING') {
-                console.log(`The instanceId ${vm.instanceId} is in ${vmStatus} and not in RUNNING, cannot restart it`)
+            const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
+
+            if (!instanceDetails) {
+                throw new Error(`The instanceId ${vm.instanceId} not found in Tencent, can not start it`)
+            }
+
+            if (instanceDetails.LatestOperation !== 'RebootInstances' || instanceDetails.LatestOperationState === 'FAILED') {
+                console.log(333)
+                await TencentVmOperation.restart(vm.instanceId)
+            }
+
+            if (instanceDetails.InstanceState !== 'RUNNING') {
                 return
             }
 
-            let instanceDetails: Instance = await cloudVmOperation.getVmDetails(vm.instanceId)
-
-            // 连续两次重启，第二次重启，不会执行 cloudVmOperation.restart(vm.instanceId) 
-            // 状态直接变成 Running Started
-            // 无法完成连续重启操作
-            if (instanceDetails.LatestOperation !== 'RebootInstances') {
-                await cloudVmOperation.restart(vm.instanceId)
-            }
-
-            instanceDetails = await cloudVmOperation.getVmDetails(vm.instanceId)
-
-            if (instanceDetails.LatestOperation === 'RebootInstances'
-                && instanceDetails.LatestOperationState === 'SUCCESS') {
-                await collection.updateOne({ _id: vm._id },
+            await collection.updateOne({ _id: vm._id },
+                {
+                    $set:
                     {
-                        $set:
-                        {
-                            state: State.Running,
-                            phase: Phase.Started,
-                            updateTime: new Date()
-                        }
-                    })
-                return
-            }
+                        state: State.Running,
+                        phase: Phase.Started,
+                        updateTime: new Date()
+                    }
+                })
 
             break
 
         default:
             throw new Error(`Unsupported VM type: ${vendorType}`)
     }
-
-
 }

@@ -1,8 +1,6 @@
 import { VmVendors, getVmVendor } from "../type"
-import { CloudVirtualMachine, Phase, TencentMeta } from "../entity"
-import { createVmOperationFactory } from "../sdk/vm-operation-factory"
+import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
-import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 
 export async function handlerCreateEvents(vm: CloudVirtualMachine) {
@@ -12,12 +10,32 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
 
     switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vendorType)
+            console.log(222)
+            // if waiting time is more than 3 minutes, operation failed 
+            const waitingTime = Date.now() - vm.updateTime.getTime()
+            if (waitingTime > 1000 * 60 * 5) {
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            state: State.Deleted,
+                            phase: Phase.Deleting,
+                            updateTime: new Date()
+                        }
+                    })
+            }
 
-            const found = await (<TencentVmOperation>cloudVmOperation.vmOperation).getVmDetailsByInstanceName(vm.instanceName)
+            const instanceList = await TencentVmOperation.getVmDetailsListByInstanceName(vm.instanceName)
 
-            if (!found) {
-                await cloudVmOperation.create(vm.metaData)
+            if (instanceList.length > 1) {
+                throw new Error(`The instanceName ${vm.instanceName} has multiple instances`)
+            }
+
+            const instance = instanceList[0]
+
+            if (!instance) {
+                console.log(333)
+                await TencentVmOperation.create(vm.metaData)
                 return
             }
 
@@ -26,37 +44,32 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                     { _id: vm._id },
                     {
                         $set: {
-                            instanceId: found.InstanceId,
+                            instanceId: instance.InstanceId,
                             updateTime: new Date()
                         }
                     })
                 return
             }
 
-            const instanceDetails: Instance = await cloudVmOperation.getVmDetails(vm.instanceId)
 
-            if (!instanceDetails) {
-                throw new Error(`The instanceId ${vm.instanceId} not found in Tencent`)
+
+            if (instance.InstanceState !== 'RUNNING') {
+                return
             }
 
-            if (instanceDetails.InstanceState === 'RUNNING') {
-                const metaData = <TencentMeta>vm.metaData
 
-                metaData.SystemDisk = instanceDetails.SystemDisk
-                metaData.DataDisks = instanceDetails.DataDisks
-                vm.loginName = instanceDetails.DefaultLoginUser
-                vm.loginPort = instanceDetails.DefaultLoginPort
-                vm.privateIpAddresses = instanceDetails.PrivateIpAddresses
-                vm.publicIpAddresses = instanceDetails.PublicIpAddresses
-
-                await collection.updateOne({ _id: vm._id }, {
-                    $set: {
-                        metaData,
-                        phase: Phase.Started,
-                        updateTime: new Date()
-                    }
-                })
-            }
+            await collection.updateOne({ _id: vm._id }, {
+                $set: {
+                    loginName: instance.DefaultLoginUser,
+                    loginPort: instance.DefaultLoginPort,
+                    privateIpAddresses: instance.PrivateIpAddresses,
+                    publicIpAddresses: instance.PublicIpAddresses,
+                    "metaData.SystemDisk": instance.SystemDisk,
+                    "metaData.DataDisks": instance.DataDisks,
+                    phase: Phase.Started,
+                    updateTime: new Date()
+                }
+            })
 
             break
 

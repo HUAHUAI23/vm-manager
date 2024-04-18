@@ -3,6 +3,7 @@ export enum VmVendors {
 }
 
 
+
 export function getVmVendor(vmTypeName: string): VmVendors | null {
     const entries = Object.entries(VmVendors).filter(([_, value]) => value === vmTypeName)
     if (entries.length === 0) {

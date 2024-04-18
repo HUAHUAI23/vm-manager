@@ -1,8 +1,7 @@
 import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { VmVendors, getVmVendor } from "../type"
-import { createVmOperationFactory } from "../sdk/vm-operation-factory"
-import assert from "assert"
+import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 
 export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -10,15 +9,20 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
     const vendorType: VmVendors = getVmVendor(vendor)
     switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vendorType)
-            const VmState = await cloudVmOperation.vmStatus(vm.instanceId)
+            console.log(2222)
+            const instanceDetails = await TencentVmOperation.getVmDetailsByInstanceName(vm.instanceName)
 
-            assert.strictEqual(VmState, 'STOPPED', `The instanceId ${vm.instanceId} is in ${VmState} and not in stopped, can not delete it`)
-
-            const instanceDetails = await cloudVmOperation.getVmDetails(vm.instanceId)
+            if (
+                instanceDetails &&
+                (instanceDetails.LatestOperation !== 'TerminateInstances'
+                    || instanceDetails.LatestOperationState === 'FAILED')
+            ) {
+                console.log(333)
+                await TencentVmOperation.delete(vm.instanceId)
+                return
+            }
 
             if (instanceDetails) {
-                await cloudVmOperation.delete(vm.instanceId)
                 return
             }
 

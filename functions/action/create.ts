@@ -1,35 +1,49 @@
-import { createCloudVm } from './vm-factory'
 import { VmVendors, getVmVendor } from '../type'
-import { Phase, State, TencentCloudVirtualMachine } from '../entity'
+import { Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackageList } from '../entity'
 import { verifyBearerToken } from '../utils'
-import { createVmOperationFactory } from '../sdk/vm-operation-factory'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
+import { TencentVm } from './tencent/tencent-vm'
 import { db } from '../db'
 
 interface IRequestBody {
-    instanceType: string
+    virtualMachinePackageName: string
+    virtualMachinePackageType: string
     imageId: string
     systemDisk: number
     dataDisks: number[]
     internetMaxBandwidthOut: number
     loginName?: string
     loginPassword: string
-    cloudProvider: string
     metaData?: {
         [key: string]: any
     }
 }
 
 export default async function (ctx: FunctionContext) {
-    const ok = verifyBearerToken(ctx.headers.token)
+    const ok = verifyBearerToken(ctx.headers.authorization)
     if (!ok) {
         return { data: null, error: 'Unauthorized' }
     }
 
+    const body: IRequestBody = ctx.request.body
+
+    const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
+
+    const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList').findOne({
+        sealosRegionUid: region.sealosRegionUid,
+        cloudProvider: region.cloudProvider,
+        cloudProviderZone: 'ap-guangzhou-6',
+        virtualMachinePackageName: body.virtualMachinePackageName,
+        virtualMachinePackageFamily: body.virtualMachinePackageType
+    })
+
+    if (!virtualMachinePackage) {
+        return { data: null, error: 'virtualMachinePackage not found' }
+    }
+
     const nanoid = await import('nanoid')
 
-    const body: IRequestBody = ctx.request.body
-    const vendorType: VmVendors = getVmVendor(body.cloudProvider)
+    const vendorType: VmVendors = getVmVendor(region.cloudProvider)
     switch (vendorType) {
         case VmVendors.Tencent:
             const gen = nanoid.customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 7)
@@ -41,11 +55,13 @@ export default async function (ctx: FunctionContext) {
                 throw new Error(`The virtual machine with the instanceName ${instanceName} already exists.`)
             }
 
-            const cloudVmOperation = createVmOperationFactory(vendorType)
-            const tencentVm = createCloudVm(vendorType)
 
-            const vmTypeDetails = await
-                (<TencentVmOperation>cloudVmOperation.vmOperation).getInstanceTypeDetails(body.instanceType)
+            const instanceConfigInfo = await
+                TencentVmOperation.describeZoneInstanceConfigInfo(virtualMachinePackage.cloudProviderVirtualMachinePackageName)
+
+            if (instanceConfigInfo.Status !== 'SELL') {
+                return { data: null, error: 'sold out' }
+            }
 
             const diskSize = body.systemDisk + body.dataDisks.reduce((acc, curr) => acc + curr, 0)
 
@@ -55,9 +71,9 @@ export default async function (ctx: FunctionContext) {
                 state: State.Running,
                 namespace: ok.namespace,
                 sealosUserId: ok.sealosUserId,
-                cpu: vmTypeDetails.CPU,
-                memory: vmTypeDetails.Memory,
-                gpu: vmTypeDetails.GPU,
+                cpu: instanceConfigInfo.Cpu,
+                memory: instanceConfigInfo.Memory,
+                gpu: instanceConfigInfo.Gpu,
                 disk: diskSize,
                 publicNetworkAccess: body.internetMaxBandwidthOut > 0,
                 internetMaxBandwidthOut: body.internetMaxBandwidthOut,
@@ -68,22 +84,20 @@ export default async function (ctx: FunctionContext) {
                 createTime: new Date(),
                 updateTime: new Date(),
                 metaData: {
+                    "SecurityGroupIds": [
+                        "sg-jvxnr55b"
+                    ],
                     InstanceChargeType: 'POSTPAID_BY_HOUR',
                     Placement: {
                         Zone: 'ap-guangzhou-6',
                         ProjectId: 1311479,
                     },
-                    InstanceType: body.instanceType,
+                    InstanceType: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
                     ImageId: body.imageId,
                     SystemDisk: {
                         DiskType: "CLOUD_BSSD",
                         DiskSize: body.systemDisk
                     },
-                    DataDisks: body.dataDisks.map((size) => ({
-                        DiskType: "CLOUD_BSSD",
-                        DiskSize: size,
-                        DeleteWithInstance: true,
-                    })),
                     VirtualPrivateCloud: {
                         VpcId: 'vpc-oin9dr9h',
                         SubnetId: 'subnet-643z86ds'
@@ -114,7 +128,16 @@ export default async function (ctx: FunctionContext) {
 
             }
 
-            await tencentVm.create(tencentCloudVirtualMachine)
+            if (body.dataDisks[0]) {
+
+                tencentCloudVirtualMachine.metaData.DataDisks = body.dataDisks.map((size) => ({
+                    DiskType: "CLOUD_BSSD",
+                    DiskSize: size,
+                    DeleteWithInstance: true,
+                }))
+            }
+
+            await TencentVm.create(tencentCloudVirtualMachine)
 
             return { data: tencentCloudVirtualMachine.instanceName, error: null }
 

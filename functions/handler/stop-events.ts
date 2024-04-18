@@ -1,9 +1,8 @@
-import { CloudVirtualMachine, Phase } from "../entity"
+import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { VmVendors, getVmVendor } from "../type"
-import { createVmOperationFactory } from "../sdk/vm-operation-factory"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
-import assert from "assert"
+import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 
 export async function handlerStopEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -11,28 +10,31 @@ export async function handlerStopEvents(vm: CloudVirtualMachine) {
     const vendorType: VmVendors = getVmVendor(vendor)
     switch (vendorType) {
         case VmVendors.Tencent:
-            const cloudVmOperation = createVmOperationFactory(vendorType)
-            const instanceDetails: Instance = await cloudVmOperation.getVmDetails(vm.instanceId)
+            console.log(222)
+
+            const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
 
             if (!instanceDetails) {
                 throw new Error(`The instanceId ${vm.instanceId} not found in Tencent, can not stop it`)
             }
 
-            if (instanceDetails.InstanceState === 'STOPPED') {
-                await collection.updateOne({ _id: vm._id },
-                    {
-                        $set: {
-                            phase: Phase.Stopped,
-                            updateTime: new Date()
-                        }
-                    })
+            if (instanceDetails.LatestOperation !== 'StopInstances' || instanceDetails.LatestOperationState === 'FAILED') {
+                console.log(333)
+                await TencentVmOperation.stop(vm.instanceId)
+            }
 
+            if (instanceDetails.InstanceState !== 'STOPPED') {
                 return
             }
 
-            assert.strictEqual(instanceDetails.InstanceState, 'RUNNING', `The instanceId ${instanceDetails.InstanceId} is in ${instanceDetails.InstanceState} and not in running, can not stop it`)
+            await collection.updateOne({ _id: vm._id },
+                {
+                    $set: {
+                        phase: Phase.Stopped,
+                        updateTime: new Date()
+                    }
+                })
 
-            await cloudVmOperation.stop(vm.instanceId)
             break
 
         default:

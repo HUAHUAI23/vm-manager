@@ -1,20 +1,20 @@
 import { verifyBearerToken } from '../utils'
 import { VmVendors, getVmVendor } from '../type'
 import { db } from '../db'
-import { TencentCloudVirtualMachine } from '../entity'
+import { Region, TencentCloudVirtualMachine } from '../entity'
 interface IRequestBody {
-    cloudProvider: string
     page: number
     pageSize: number
 }
 
 export default async function (ctx: FunctionContext) {
-    const ok = verifyBearerToken(ctx.headers.token)
+    const ok = verifyBearerToken(ctx.headers.authorization)
     if (!ok) {
         return { data: null, error: 'Unauthorized' }
     }
+    const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
     const body: IRequestBody = ctx.request.body
-    const vendorType: VmVendors = getVmVendor(body.cloudProvider)
+    const vendorType: VmVendors = getVmVendor(region.cloudProvider)
     switch (vendorType) {
         case VmVendors.Tencent:
             const total = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine')

@@ -1,13 +1,18 @@
 import cloud from '@lafjs/cloud'
 import { Cron } from "croner"
 export function verifyBearerToken(token: string) {
+    if (typeof token !== 'string') {
+        throw new Error('Expected a string as authHeader')
+    }
+
     const payload = cloud.parseToken(token)
     if (payload === null) {
         return false
     }
     return {
         namespace: payload.workspaceId,
-        sealosUserId: payload.userId
+        sealosUserId: payload.userId,
+        sealosRegionUid: payload.regionUid
     }
 }
 
@@ -39,7 +44,8 @@ export function validateDTO(dto, schema) {
     return true
 }
 
-export const ReconcileStateJob =  Cron("*/2 * * * * *", {
+export const ReconcileStateJob = Cron("*/5 * * * * *", {
+    name: "ReconcileStateJob",
     catch: true,
     paused: true,
     unref: true,                  // 允许进程在定时器运行时退出（Node.js 和 Deno 环境）

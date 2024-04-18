@@ -66,6 +66,9 @@ export class CloudVirtualMachine {
   loginPort?: number
 
   cloudProvider: VmVendors
+  sealosRegionUid?: string
+  sealosRegionDomain?: string
+  latestBillingTime?: Date
   changeType?: ChangeType
   // 创建时间
   createTime: Date
@@ -77,6 +80,7 @@ export class CloudVirtualMachine {
 }
 
 export interface TencentMeta {
+  SecurityGroupIds: Array<string>
   InstanceChargeType: string
   Placement: {
     Zone: string
@@ -112,4 +116,67 @@ export interface TencentMeta {
 
 export class TencentCloudVirtualMachine extends CloudVirtualMachine {
   declare metaData: TencentMeta
+}
+
+export class Region {
+  _id?: ObjectId
+  sealosRegionUid: string
+  sealosRegionDomain: string
+  // sealos 所在云服务商
+  cloudProvider: VmVendors
+  // sealos k8s 所在云服务商的可用区
+  cloudProviderZone: string
+}
+export class CloudVirtualMachineZone {
+  _id?: ObjectId
+  regionId: ObjectId
+  cloudProviderZone: string
+}
+export class VirtualMachinePackageType {
+  _id: ObjectId
+  cloudVirtualMachineZoneId: ObjectId
+  cloudProviderPrincePackageType: string
+  sealosType: string
+}
+
+export class VirtualMachinePackageList {
+  _id?: ObjectId
+  virtualMachinePackageFamily: string
+  virtualMachinePackageName: string
+  sealosRegionUid: string
+  sealosRegionDomain: string
+  cloudProvider: VmVendors
+  cloudProviderZone: string
+  cloudProviderVirtualMachinePackageFamily: string
+  cloudProviderVirtualMachinePackageName: string
+  instancePrice: number
+  diskPerG: number
+  networkSpeedBoundary: number
+  networkSpeedUnderSpeedBoundaryPerHour: number
+  networkSpeedAboveSpeedBoundaryPerHour: number
+}
+
+export enum CloudVirtualMachineBillingState {
+  Pending = 'Pending',
+  Done = 'Done',
+}
+
+export class CloudVirtualMachineBilling {
+  _id?: ObjectId
+  princePackage: string
+  cloudProvider: VmVendors
+  namespace: string
+  PrincePackageId: ObjectId
+  startAt: Date
+  endAt: Date
+  sealosUserId: string
+  sealosRegionUid: string
+  sealosRegionDomain: string
+  amount: number
+  detail: {
+    instance: number
+    network: number
+    disk: number
+  }
+  state: CloudVirtualMachineBillingState
 }
