@@ -2,6 +2,8 @@ import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { VmVendors, getVmVendor } from "../type"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
+import { TASK_LOCK_INIT_TIME, sleepTime } from "../constants"
+import { sleep } from "../utils"
 
 export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -18,11 +20,33 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
                     || instanceDetails.LatestOperationState === 'FAILED')
             ) {
                 console.log(333)
-                await TencentVmOperation.delete(vm.instanceId)
+                await TencentVmOperation.delete(instanceDetails.InstanceId)
+
+                await sleep(sleepTime)
+
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+
                 return
             }
 
             if (instanceDetails) {
+
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+
                 return
             }
 
@@ -30,7 +54,8 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
                 {
                     $set: {
                         phase: Phase.Deleted,
-                        updateTime: new Date()
+                        updateTime: new Date(),
+                        lockedAt: TASK_LOCK_INIT_TIME
                     }
                 })
 

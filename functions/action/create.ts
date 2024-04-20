@@ -1,13 +1,14 @@
 import { VmVendors, getVmVendor } from '../type'
-import { Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackageList } from '../entity'
-import { verifyBearerToken } from '../utils'
+import { ChargeType, Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackageList } from '../entity'
+import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
 import { TencentVm } from './tencent/tencent-vm'
 import { db } from '../db'
-
+import { TASK_LOCK_INIT_TIME } from '../constants'
+import { getCloudVirtualMachineOneHourFee } from '../billing-task'
 interface IRequestBody {
     virtualMachinePackageName: string
-    virtualMachinePackageType: string
+    virtualMachinePackageFamily: string
     imageId: string
     systemDisk: number
     dataDisks: number[]
@@ -19,6 +20,20 @@ interface IRequestBody {
     }
 }
 
+const iRequestBodySchema = {
+    virtualMachinePackageName: value => typeof value === 'string',
+    virtualMachinePackageFamily: value => typeof value === 'string',
+    imageId: value => typeof value === 'string',
+    systemDisk: value => typeof value === 'number' && Number.isInteger(value),
+    dataDisks: value => Array.isArray(value) && value.every(item => typeof item === 'number' && Number.isInteger(item)),
+    internetMaxBandwidthOut: value => typeof value === 'number',
+    loginName: value => typeof value === 'string' || value === undefined,
+    loginPassword: value => typeof value === 'string',
+    metaData: value => typeof value === 'object' && value !== null || value === undefined
+}
+
+
+
 export default async function (ctx: FunctionContext) {
     const ok = verifyBearerToken(ctx.headers.authorization)
     if (!ok) {
@@ -27,18 +42,44 @@ export default async function (ctx: FunctionContext) {
 
     const body: IRequestBody = ctx.request.body
 
+    try {
+        validateDTO(body, iRequestBodySchema)
+    } catch (error) {
+        return { data: null, error: error.message }
+    }
+
     const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
 
-    const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList').findOne({
-        sealosRegionUid: region.sealosRegionUid,
-        cloudProvider: region.cloudProvider,
-        cloudProviderZone: 'ap-guangzhou-6',
-        virtualMachinePackageName: body.virtualMachinePackageName,
-        virtualMachinePackageFamily: body.virtualMachinePackageType
-    })
+    if (!region) {
+        return { data: null, error: 'Region not found' }
+    }
+
+    const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList')
+        .findOne({
+            sealosRegionUid: region.sealosRegionUid,
+            cloudProvider: region.cloudProvider,
+            cloudProviderZone: 'ap-guangzhou-6',
+            virtualMachinePackageName: body.virtualMachinePackageName,
+            virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+            chargeType: ChargeType.PostPaidByHour
+        })
 
     if (!virtualMachinePackage) {
         return { data: null, error: 'virtualMachinePackage not found' }
+    }
+
+    const diskSize = body.systemDisk + (body.dataDisks ? body.dataDisks.reduce((acc, curr) => acc + curr, 0) : 0)
+
+    const cloudVirtualMachineOneHourFee = getCloudVirtualMachineOneHourFee(
+        virtualMachinePackage,
+        body.internetMaxBandwidthOut ? body.internetMaxBandwidthOut : 0,
+        diskSize
+    )
+
+    const sealosAccountRMB = await getSealosUserAccount(ok.sealosUserUid)
+
+    if (sealosAccountRMB < cloudVirtualMachineOneHourFee) {
+        return { data: null, error: 'Insufficient balance' }
     }
 
     const nanoid = await import('nanoid')
@@ -63,26 +104,34 @@ export default async function (ctx: FunctionContext) {
                 return { data: null, error: 'sold out' }
             }
 
-            const diskSize = body.systemDisk + body.dataDisks.reduce((acc, curr) => acc + curr, 0)
-
 
             const tencentCloudVirtualMachine: TencentCloudVirtualMachine = {
                 phase: Phase.Creating,
                 state: State.Running,
                 namespace: ok.namespace,
                 sealosUserId: ok.sealosUserId,
+                sealosUserUid: ok.sealosUserUid,
+                sealosRegionDomain: region.sealosRegionDomain,
+                sealosRegionUid: region.sealosRegionUid,
+                regionId: region._id,
                 cpu: instanceConfigInfo.Cpu,
                 memory: instanceConfigInfo.Memory,
                 gpu: instanceConfigInfo.Gpu,
                 disk: diskSize,
                 publicNetworkAccess: body.internetMaxBandwidthOut > 0,
-                internetMaxBandwidthOut: body.internetMaxBandwidthOut,
+                internetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
                 imageId: body.imageId,
                 instanceName: instanceName,
                 loginPassword: body.loginPassword,
                 cloudProvider: VmVendors.Tencent,
+                cloudProviderVirtualMachinePackageFamily: virtualMachinePackage.cloudProviderVirtualMachinePackageFamily,
+                cloudProviderVirtualMachinePackageName: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
+                chargeType: ChargeType.PostPaidByHour,
                 createTime: new Date(),
                 updateTime: new Date(),
+                latestBillingTime: TASK_LOCK_INIT_TIME,
+                billingLockedAt: TASK_LOCK_INIT_TIME,
+                lockedAt: TASK_LOCK_INIT_TIME,
                 metaData: {
                     "SecurityGroupIds": [
                         "sg-jvxnr55b"
@@ -128,7 +177,7 @@ export default async function (ctx: FunctionContext) {
 
             }
 
-            if (body.dataDisks[0]) {
+            if (body?.dataDisks[0]) {
 
                 tencentCloudVirtualMachine.metaData.DataDisks = body.dataDisks.map((size) => ({
                     DiskType: "CLOUD_BSSD",

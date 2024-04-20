@@ -14,6 +14,11 @@ export default async function (ctx: FunctionContext) {
     }
 
     const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
+
+    if (!region) {
+        return { data: null, error: 'Region not found' }
+    }
+
     const vendorType: VmVendors = getVmVendor(region.cloudProvider)
     switch (vendorType) {
         case VmVendors.Tencent:
@@ -28,17 +33,6 @@ export default async function (ctx: FunctionContext) {
                         },
                     ],
                     url: 'https://objectstorageapi.hzh.sealos.run/u2jbon3l-system-image/Ubuntu.svg',
-                },
-                centos: {
-                    images: [
-                        {
-                            id: 'img-l8og963d',
-                            os: 'centos',
-                            version: '7.9',
-                            architect: 'x86_64',
-                        },
-                    ],
-                    url: 'https://objectstorageapi.hzh.sealos.run/u2jbon3l-system-image/Centos.svg',
                 },
                 debian: {
                     images: [

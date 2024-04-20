@@ -1,0 +1,6 @@
+name: constants
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

@@ -1,0 +1,6 @@
+name: health
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

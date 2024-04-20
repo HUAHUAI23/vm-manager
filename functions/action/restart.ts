@@ -1,11 +1,16 @@
 import { VmVendors, getVmVendor } from '../type'
-import { verifyBearerToken } from '../utils'
-import { IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine } from '../entity'
+import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
+import { ChargeType, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackageList } from '../entity'
 import { db } from '../db'
 import { TencentVm } from './tencent/tencent-vm'
+import { getCloudVirtualMachineOneHourFee } from '../billing-task'
 
 interface IRequestBody {
     instanceName: string
+}
+
+const iRequestBodySchema = {
+    instanceName: value => typeof value === 'string'
 }
 
 export default async function (ctx: FunctionContext) {
@@ -16,7 +21,19 @@ export default async function (ctx: FunctionContext) {
     }
 
     const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
+
+    if (!region) {
+        return { data: null, error: 'Region not found' }
+    }
+
     const body: IRequestBody = ctx.request.body
+
+    try {
+        validateDTO(body, iRequestBodySchema)
+    } catch (error) {
+        return { data: null, error: error.message }
+    }
+
     const vendorType: VmVendors = getVmVendor(region.cloudProvider)
 
     switch (vendorType) {
@@ -33,6 +50,28 @@ export default async function (ctx: FunctionContext) {
                 return { data: null, error: 'Virtual Machine not found' }
             }
 
+            const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList')
+                .findOne({
+                    sealosRegionUid: region.sealosRegionUid,
+                    cloudProvider: region.cloudProvider,
+                    cloudProviderZone: 'ap-guangzhou-6',
+                    cloudProviderVirtualMachinePackageName: tencentVm.cloudProviderVirtualMachinePackageName,
+                    cloudProviderVirtualMachinePackageFamily: tencentVm.cloudProviderVirtualMachinePackageFamily,
+                    chargeType: ChargeType.PostPaidByHour
+                })
+
+            const cloudVirtualMachineOneHourFee = getCloudVirtualMachineOneHourFee(
+                virtualMachinePackage,
+                tencentVm.internetMaxBandwidthOut ? tencentVm.internetMaxBandwidthOut : 0,
+                tencentVm.disk
+            )
+            const sealosAccountRMB = await getSealosUserAccount(ok.sealosUserUid)
+
+            if (sealosAccountRMB < cloudVirtualMachineOneHourFee) {
+                return { data: null, error: 'Insufficient balance' }
+            }
+
+            // 检查状态是否为中间态
             if (IntermediateStates.includes(tencentVm.state)) {
                 return { data: null, error: `The virtual machine is in an ${tencentVm.state} state and cannot be restart.` }
             }
@@ -41,11 +80,16 @@ export default async function (ctx: FunctionContext) {
                 return { data: null, error: `The virtual machine is in an ${tencentVm.phase} state and cannot be restart.` }
             }
 
+            // 检查 phase 是否为 Started
             if (tencentVm.phase !== Phase.Started) {
                 return { data: null, error: 'The virtual machine is not started and cannot be restart.' }
             }
 
-            await TencentVm.restart(tencentVm)
+            const success = await TencentVm.restart(tencentVm)
+
+            if (!success) {
+                return { data: null, error: 'Account in arrears, unable to perform VM change operations' }
+            }
 
             return { data: tencentVm.instanceName, error: null }
 

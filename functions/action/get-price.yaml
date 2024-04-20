@@ -1,0 +1,6 @@
+name: action/get-price
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []

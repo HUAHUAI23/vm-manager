@@ -1,7 +1,9 @@
 import cloud from '@lafjs/cloud'
 import { reconcile } from './reconcile'
+import { billingJob } from './billing-task'
 import util from 'util'
 
+// 添加任务监测的扒插系统
 export default async function (ctx: FunctionContext) {
   if (ctx.body.secret !== process.env.DEBUG_SECRET) {
     return
@@ -39,11 +41,16 @@ function generateTestToken() {
 }
 // 2
 function checkJobIsRunning() {
-  console.log('Job isStopped: ', reconcile.reconcileStateJob.isStopped())
-  console.log('Job isBusy: ', reconcile.reconcileStateJob.isBusy())
-  console.log('Job isRunning: ', reconcile.reconcileStateJob.isRunning())
+  console.log('reconcile job isStopped: ', reconcile.reconcileStateJob.isStopped())
+  console.log('reconcile job isBusy: ', reconcile.reconcileStateJob.isBusy())
+  console.log('reconcile Job isRunning: ', reconcile.reconcileStateJob.isRunning())
+  console.log('billing job isStopped: ', billingJob.isStopped())
+  console.log('billing job isBusy: ', billingJob.isBusy())
+  console.log('billing job isRunning: ', billingJob.isRunning())
   console.log('-------------------')
   console.log('reconcileStateJob: ', util.inspect(reconcile.reconcileStateJob, { showHidden: false, depth: 2 }))
+  console.log('-------------------')
+  console.log('biling job: ', util.inspect(billingJob, { showHidden: false, depth: 2 }))
 }
 // 3
 function pauseJob() {

@@ -40,6 +40,9 @@ export enum ChangeType {
   ChangeInstanceType = 'ChangeInstanceType',
   ChangeDisk = 'ChangeDisk'
 }
+export enum ChargeType {
+  PostPaidByHour = 'postPaidByHour',
+}
 
 export class CloudVirtualMachine {
   _id?: ObjectId
@@ -47,6 +50,7 @@ export class CloudVirtualMachine {
   state: State
   namespace: string
   sealosUserId: string
+  sealosUserUid: string
 
   cpu: number
   memory: number
@@ -66,14 +70,21 @@ export class CloudVirtualMachine {
   loginPort?: number
 
   cloudProvider: VmVendors
-  sealosRegionUid?: string
-  sealosRegionDomain?: string
-  latestBillingTime?: Date
+  sealosRegionUid: string
+  sealosRegionDomain: string
+  regionId: ObjectId
+  cloudProviderVirtualMachinePackageName: string
+  cloudProviderVirtualMachinePackageFamily: string
   changeType?: ChangeType
+  chargeType: ChargeType
   // 创建时间
   createTime: Date
   // 状态变更时，该时间会发生变化
   updateTime: Date
+  lockedAt: Date
+  billingLockedAt: Date
+  latestBillingTime: Date
+  oweAt?: Date
   metaData: {
     [key: string]: any
   }
@@ -154,6 +165,7 @@ export class VirtualMachinePackageList {
   networkSpeedBoundary: number
   networkSpeedUnderSpeedBoundaryPerHour: number
   networkSpeedAboveSpeedBoundaryPerHour: number
+  chargeType: ChargeType
 }
 
 export enum CloudVirtualMachineBillingState {
@@ -163,13 +175,14 @@ export enum CloudVirtualMachineBillingState {
 
 export class CloudVirtualMachineBilling {
   _id?: ObjectId
-  princePackage: string
-  cloudProvider: VmVendors
+  instanceName: string
   namespace: string
-  PrincePackageId: ObjectId
+  virtualMachinePackageId: ObjectId
   startAt: Date
   endAt: Date
+  cloudProvider: VmVendors
   sealosUserId: string
+  sealosUserUid: string
   sealosRegionUid: string
   sealosRegionDomain: string
   amount: number

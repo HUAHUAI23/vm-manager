@@ -9,6 +9,7 @@ import { handleRestartEvents } from './handler/restart-events'
 import { handlerStopEvents } from './handler/stop-events'
 import { handlerDeleteEvents } from './handler/delete-events'
 import { handlerChangeEvents } from './handler/change-events'
+import { stateChangeLockTime } from './constants'
 import { Cron } from "croner"
 
 // 创建事件发射器
@@ -28,85 +29,114 @@ async function reconcileState() {
         const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
 
         // 创建
-        const create = await collection.aggregate([
-            {
-                $match: {
-                    state: State.Running,
-                    phase: { $in: [Phase.Creating, Phase.Created] }
-                }
+        const create = await collection.findOneAndUpdate({
+            lockedAt: {
+                $lt: new Date(Date.now() - stateChangeLockTime),
             },
-            { $sample: { size: 1 } }
-        ]).toArray()
-        const createDoc = create[0]
-        if (createDoc) eventEmitter.emit(EVENT_CREATE, createDoc)
+            state: State.Running,
+            phase: {
+                $in: [Phase.Creating, Phase.Created]
+
+            }
+        }, {
+            $set: { lockedAt: new Date() }
+
+        })
+
+        const createDoc = create.value
+        if (createDoc) { eventEmitter.emit(EVENT_CREATE, createDoc) }
 
         // 启动
-        const start = await collection.aggregate([
+        const start = await collection.findOneAndUpdate(
             {
-                $match: {
-                    state: State.Running,
-                    phase: Phase.Starting
-                }
+                lockedAt: {
+                    $lt: new Date(Date.now() - stateChangeLockTime),
+                },
+                state: State.Running,
+                phase: Phase.Starting
             },
-            { $sample: { size: 1 } }
-        ]).toArray()
-        const startDoc = start[0]
-        if (startDoc) eventEmitter.emit(EVENT_START, startDoc)
+            {
+                $set: { lockedAt: new Date() }
+            })
+
+        const startDoc = start.value
+        if (startDoc) { eventEmitter.emit(EVENT_START, startDoc) }
 
         // 重启
-        const restart = await collection.aggregate([
+        const restart = await collection.findOneAndUpdate(
             {
-                $match: {
-                    state: State.Restarting,
-                    phase: {
-                        $in:
-                            [Phase.Started, Phase.Stopping, Phase.Stopped, Phase.Starting]
-                    }
+                lockedAt: {
+                    $lt: new Date(Date.now() - stateChangeLockTime),
+                },
+                state: State.Restarting,
+                phase: {
+                    $in:
+                        [Phase.Started, Phase.Stopping, Phase.Stopped, Phase.Starting]
                 }
-            },
-            { $sample: { size: 1 } }
-        ]).toArray()
-        const restartDoc = restart[0]
-        if (restartDoc) eventEmitter.emit(EVENT_RESTART, restartDoc)
+            }, {
+            $set: {
+                lockedAt: new Date()
+            }
+        }
+        )
+
+        const restartDoc = restart.value
+        if (restartDoc) { eventEmitter.emit(EVENT_RESTART, restartDoc) }
 
         // 关闭
-        const stop = await collection.aggregate([
+        const stop = await collection.findOneAndUpdate(
             {
-                $match: {
-                    state: State.Stopped,
-                    phase: Phase.Stopping
-                }
-            },
-            { $sample: { size: 1 } }
-        ]).toArray()
-        const stopDoc = stop[0]
-        if (stopDoc) eventEmitter.emit(EVENT_STOP, stopDoc)
+                lockedAt: {
+                    $lt: new Date(Date.now() - stateChangeLockTime),
+                },
+                state: State.Stopped,
+                phase: Phase.Stopping
+            }, {
+            $set: {
+                lockedAt: new Date()
+            }
+        }
+        )
+
+        const stopDoc = stop.value
+        if (stopDoc) { eventEmitter.emit(EVENT_STOP, stopDoc) }
 
         // 删除
-        const destroy = await collection.aggregate([
+        const destroy = await collection.findOneAndUpdate(
             {
-                $match: {
-                    state: State.Deleted,
-                    phase: { $in: [Phase.Deleting, Phase.Deleted] }
-                }
-            },
-            { $sample: { size: 1 } }
-        ]).toArray()
-        const deleteDoc = destroy[0]
-        if (deleteDoc) eventEmitter.emit(EVENT_DELETE, deleteDoc)
+                lockedAt: {
+                    $lt: new Date(Date.now() - stateChangeLockTime),
+                },
+                state: State.Deleted,
+                phase: { $in: [Phase.Deleting, Phase.Deleted] }
+            }, {
+            $set: {
+                lockedAt: new Date()
+            }
+        }
+        )
+
+        const deleteDoc = destroy.value
+        if (deleteDoc) { eventEmitter.emit(EVENT_DELETE, deleteDoc) }
 
         // 变更
-        const change = await collection.aggregate([
+        const change = await collection.findOneAndUpdate(
             {
-                $match: {
-                    state: State.Changing,
-                    phase: Phase.Stopped
-                }
+                lockedAt: {
+                    $lt: new Date(Date.now() - stateChangeLockTime),
+                },
+                state: State.Changing,
+                phase: Phase.Stopped
             },
-            { $sample: { size: 1 } }
-        ]).toArray()
-        const changeDoc = change[0]
-        if (changeDoc) eventEmitter.emit(EVENT_CHANGE, changeDoc)
+            {
+                $set: {
+                    lockedAt: new Date()
+                }
+            }
+        )
+
+        const changeDoc = change.value
+        if (changeDoc) { eventEmitter.emit(EVENT_CHANGE, changeDoc) }
 
 
     } catch (error) {

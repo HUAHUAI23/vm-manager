@@ -2,27 +2,35 @@ import { VmVendors, getVmVendor } from "../type"
 import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
+import { TASK_LOCK_INIT_TIME, sleepTime, timeOut } from "../constants"
+import { sleep } from "../utils"
 
 export async function handlerCreateEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
     const vendorType: VmVendors = getVmVendor(vendor)
+    // todo 设置锁，解决多实例下    await TencentVmOperation.create(vm.metaData) 并发请求问题
 
     switch (vendorType) {
         case VmVendors.Tencent:
             console.log(222)
             // if waiting time is more than 3 minutes, operation failed 
             const waitingTime = Date.now() - vm.updateTime.getTime()
-            if (waitingTime > 1000 * 60 * 5) {
+
+            if (waitingTime > timeOut) {
+
                 await collection.updateOne(
                     { _id: vm._id },
                     {
                         $set: {
                             state: State.Deleted,
                             phase: Phase.Deleting,
-                            updateTime: new Date()
+                            updateTime: new Date(),
+                            lockedAt: TASK_LOCK_INIT_TIME
                         }
                     })
+
+                return
             }
 
             const instanceList = await TencentVmOperation.getVmDetailsListByInstanceName(vm.instanceName)
@@ -36,6 +44,17 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
             if (!instance) {
                 console.log(333)
                 await TencentVmOperation.create(vm.metaData)
+                // sleep
+                await sleep(sleepTime)
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+
                 return
             }
 
@@ -45,15 +64,26 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                     {
                         $set: {
                             instanceId: instance.InstanceId,
-                            updateTime: new Date()
+                            updateTime: new Date(),
+                            lockedAt: TASK_LOCK_INIT_TIME
                         }
                     })
+
                 return
             }
 
 
 
             if (instance.InstanceState !== 'RUNNING') {
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+
                 return
             }
 
@@ -67,7 +97,8 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                     "metaData.SystemDisk": instance.SystemDisk,
                     "metaData.DataDisks": instance.DataDisks,
                     phase: Phase.Started,
-                    updateTime: new Date()
+                    updateTime: new Date(),
+                    lockedAt: TASK_LOCK_INIT_TIME
                 }
             })
 

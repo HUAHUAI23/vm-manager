@@ -2,7 +2,9 @@ import { VmVendors, getVmVendor } from "../type"
 import { db } from "../db"
 import { CloudVirtualMachine, Phase, State } from "../entity"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
-import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
+import { TencentVmOperation } from "../sdk/tencent/tencent-sdk"
+import { TASK_LOCK_INIT_TIME, sleepTime } from "../constants"
+import { sleep } from "../utils"
 
 export async function handleRestartEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -16,15 +18,37 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
             const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
 
             if (!instanceDetails) {
-                throw new Error(`The instanceId ${vm.instanceId} not found in Tencent, can not start it`)
+                throw new Error(`The instanceName ${vm.instanceName} not found in Tencent, can not start it`)
             }
 
             if (instanceDetails.LatestOperation !== 'RebootInstances' || instanceDetails.LatestOperationState === 'FAILED') {
                 console.log(333)
                 await TencentVmOperation.restart(vm.instanceId)
+
+                await sleep(sleepTime)
+
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+
+                return
             }
 
             if (instanceDetails.InstanceState !== 'RUNNING') {
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+
                 return
             }
 
@@ -34,7 +58,8 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
                     {
                         state: State.Running,
                         phase: Phase.Started,
-                        updateTime: new Date()
+                        updateTime: new Date(),
+                        lockedAt: TASK_LOCK_INIT_TIME
                     }
                 })
 

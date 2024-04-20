@@ -1,5 +1,0 @@
-name: action/get-virtual-machine-type
-desc: ""
-methods:
-  - POST
-tags: []

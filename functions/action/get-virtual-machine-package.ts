@@ -2,11 +2,11 @@ import { db } from "../db"
 import { TencentVmOperation } from "../sdk/tencent/tencent-sdk"
 import { VmVendors, getVmVendor } from "../type"
 import { verifyBearerToken } from "../utils"
-import { Region, VirtualMachinePackageList } from "@/entity"
+import { ChargeType, Region, VirtualMachinePackageList } from "../entity"
 import { InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 
 interface IResponse {
-    data: VirtualMachineSet[]
+    data: VirtualMachinePackage[]
     error: Error
 }
 enum Status {
@@ -14,7 +14,7 @@ enum Status {
     Unavailable = 'unavailable'
 }
 
-interface VirtualMachineSet {
+interface VirtualMachinePackage {
     cpu?: number
     memory?: number
     gpu?: number
@@ -28,25 +28,28 @@ interface VirtualMachineSet {
     status: Status
 }
 
-function tencentMapAndTransform(vmPackages: VirtualMachinePackageList[], instanceTypes: InstanceTypeQuotaItem[]): VirtualMachineSet[] {
-    return vmPackages.map(vmPackage => {
-        const matchedInstanceType = instanceTypes.find(instanceType => instanceType.InstanceType === vmPackage.cloudProviderVirtualMachinePackageName)
+function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackageList[], instanceTypes: InstanceTypeQuotaItem[]): VirtualMachinePackage[] {
+    return virtualMachinePackages.map(virtualMachinePackage => {
+        const matchedInstanceType = instanceTypes.find(instanceType => instanceType.InstanceType === virtualMachinePackage.cloudProviderVirtualMachinePackageName)
+
         if (!matchedInstanceType) {
-            throw new Error(`No matching instance type found for ${vmPackage.cloudProviderVirtualMachinePackageName}`)
+            throw new Error(`No matching instance type found for ${virtualMachinePackage.cloudProviderVirtualMachinePackageName}`)
         }
+
         return {
             cpu: matchedInstanceType.Cpu,
             memory: matchedInstanceType.Memory,
             gpu: matchedInstanceType.Gpu,
-            virtualMachinePackageFamily: vmPackage.virtualMachinePackageFamily,
-            virtualMachinePackageName: vmPackage.virtualMachinePackageName,
-            instancePrice: vmPackage.instancePrice,
-            diskPerG: vmPackage.diskPerG,
-            networkSpeedBoundary: vmPackage.networkSpeedBoundary,
-            networkSpeedUnderSpeedBoundaryPerHour: vmPackage.networkSpeedUnderSpeedBoundaryPerHour,
-            networkSpeedAboveSpeedBoundaryPerHour: vmPackage.networkSpeedAboveSpeedBoundaryPerHour,
+            virtualMachinePackageFamily: virtualMachinePackage.virtualMachinePackageFamily,
+            virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
+            instancePrice: virtualMachinePackage.instancePrice,
+            diskPerG: virtualMachinePackage.diskPerG,
+            networkSpeedBoundary: virtualMachinePackage.networkSpeedBoundary,
+            networkSpeedUnderSpeedBoundaryPerHour: virtualMachinePackage.networkSpeedUnderSpeedBoundaryPerHour,
+            networkSpeedAboveSpeedBoundaryPerHour: virtualMachinePackage.networkSpeedAboveSpeedBoundaryPerHour,
             status: matchedInstanceType.Status === "SELL" ? Status.Available : Status.Unavailable
         }
+
     })
 }
 
@@ -54,11 +57,16 @@ function tencentMapAndTransform(vmPackages: VirtualMachinePackageList[], instanc
 
 export default async function (ctx: FunctionContext) {
     const ok = verifyBearerToken(ctx.headers.authorization)
+
     if (!ok) {
         return { data: null, error: 'Unauthorized' }
     }
 
     const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
+
+    if (!region) {
+        return { data: null, error: 'Region not found' }
+    }
 
     const vendorType = getVmVendor(region.cloudProvider)
 
@@ -67,14 +75,15 @@ export default async function (ctx: FunctionContext) {
             const vmTypeList = await
                 TencentVmOperation.describeZoneInstanceConfigInfos()
 
-            const virutalMachinePackageList = await db.collection<VirtualMachinePackageList>('VirutalMachinePackageList').
+            const virtualMachinePackageList = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList').
                 find({
                     sealosRegionUid: region.sealosRegionUid,
                     cloudProvider: region.cloudProvider,
-                    cloudProviderZone: 'ap-guangzhou-6'
+                    cloudProviderZone: 'ap-guangzhou-6',
+                    chargeType: ChargeType.PostPaidByHour
                 }).toArray()
 
-            const virtualMachineSet: VirtualMachineSet[] = tencentMapAndTransform(virutalMachinePackageList, vmTypeList)
+            const virtualMachineSet: VirtualMachinePackage[] = tencentMapAndTransform(virtualMachinePackageList, vmTypeList)
 
             virtualMachineSet.sort((a, b) => {
                 // 首先按 CPU 排序

@@ -3,6 +3,8 @@ name: vm-manager
 spec:
   runtime: node
   dependencies:
-    tencentcloud-sdk-nodejs: latest
     nanoid: latest
     croner: latest
+    decimal.js: 10.4.3
+    tencentcloud-sdk-nodejs: 4.0.838
+    pg: 8.11.5
