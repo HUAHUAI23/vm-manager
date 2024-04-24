@@ -2,11 +2,11 @@ import { db } from "../db"
 import { TencentVmOperation } from "../sdk/tencent/tencent-sdk"
 import { VmVendors, getVmVendor } from "../type"
 import { verifyBearerToken } from "../utils"
-import { ChargeType, Region, VirtualMachinePackageList } from "../entity"
+import { ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily } from "../entity"
 import { InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 
 interface IResponse {
-    data: VirtualMachinePackage[]
+    data: sealosVirtualMachinePackage[]
     error: Error
 }
 enum Status {
@@ -14,7 +14,7 @@ enum Status {
     Unavailable = 'unavailable'
 }
 
-interface VirtualMachinePackage {
+interface sealosVirtualMachinePackage {
     cpu?: number
     memory?: number
     gpu?: number
@@ -27,8 +27,10 @@ interface VirtualMachinePackage {
     networkSpeedAboveSpeedBoundaryPerHour: number
     status: Status
 }
+const zone = 'ap-guangzhou-6'
+const family = 'A'
 
-function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackageList[], instanceTypes: InstanceTypeQuotaItem[]): VirtualMachinePackage[] {
+function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackage[], virtualMachinePackageFamilyName: string, instanceTypes: InstanceTypeQuotaItem[]): sealosVirtualMachinePackage[] {
     return virtualMachinePackages.map(virtualMachinePackage => {
         const matchedInstanceType = instanceTypes.find(instanceType => instanceType.InstanceType === virtualMachinePackage.cloudProviderVirtualMachinePackageName)
 
@@ -40,7 +42,7 @@ function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackageLis
             cpu: matchedInstanceType.Cpu,
             memory: matchedInstanceType.Memory,
             gpu: matchedInstanceType.Gpu,
-            virtualMachinePackageFamily: virtualMachinePackage.virtualMachinePackageFamily,
+            virtualMachinePackageFamily: virtualMachinePackageFamilyName,
             virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
             instancePrice: virtualMachinePackage.instancePrice,
             diskPerG: virtualMachinePackage.diskPerG,
@@ -75,17 +77,34 @@ export default async function (ctx: FunctionContext) {
             const vmTypeList = await
                 TencentVmOperation.describeZoneInstanceConfigInfos()
 
-            const virtualMachinePackageList = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList').
+
+            const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
+                .findOne({ regionId: region._id, cloudProviderZone: zone })
+
+            if (!cloudVirtualMachineZone) {
+                return { data: null, error: 'CloudVirtualMachineZone not found' }
+            }
+
+            const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
+                .findOne({
+                    cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+                    virtualMachinePackageFamily: family
+                })
+
+            if (!virtualMachinePackageFamily) {
+                return { data: null, error: 'virtualMachinePackageFamily not found' }
+            }
+
+            const virtualMachinePackageList = await db.collection<VirtualMachinePackage>('VirtualMachinePackage').
                 find({
-                    sealosRegionUid: region.sealosRegionUid,
-                    cloudProvider: region.cloudProvider,
-                    cloudProviderZone: 'ap-guangzhou-6',
+                    virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
                     chargeType: ChargeType.PostPaidByHour
                 }).toArray()
 
-            const virtualMachineSet: VirtualMachinePackage[] = tencentMapAndTransform(virtualMachinePackageList, vmTypeList)
+            const sealosVirtualMachineList: sealosVirtualMachinePackage[] =
+                tencentMapAndTransform(virtualMachinePackageList, virtualMachinePackageFamily.virtualMachinePackageFamily, vmTypeList)
 
-            virtualMachineSet.sort((a, b) => {
+            sealosVirtualMachineList.sort((a, b) => {
                 // 首先按 CPU 排序
                 if (a.cpu !== b.cpu) {
                     return a.cpu - b.cpu
@@ -99,7 +118,7 @@ export default async function (ctx: FunctionContext) {
             })
 
             const data: IResponse = {
-                data: virtualMachineSet,
+                data: sealosVirtualMachineList,
                 error: null
             }
 

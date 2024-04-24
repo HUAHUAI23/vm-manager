@@ -1,5 +1,5 @@
 import { VmVendors, getVmVendor } from '../type'
-import { ChargeType, Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackageList } from '../entity'
+import { ChargeType, CloudVirtualMachineZone, Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
 import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
 import { TencentVm } from './tencent/tencent-vm'
@@ -7,8 +7,8 @@ import { db } from '../db'
 import { TASK_LOCK_INIT_TIME } from '../constants'
 import { getCloudVirtualMachineOneHourFee } from '../billing-task'
 interface IRequestBody {
-    virtualMachinePackageName: string
     virtualMachinePackageFamily: string
+    virtualMachinePackageName: string
     imageId: string
     systemDisk: number
     dataDisks: number[]
@@ -54,13 +54,29 @@ export default async function (ctx: FunctionContext) {
         return { data: null, error: 'Region not found' }
     }
 
-    const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList')
+    const zone = 'ap-guangzhou-6'
+
+    const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
+        .findOne({ regionId: region._id, cloudProviderZone: zone })
+
+    if (!cloudVirtualMachineZone) {
+        return { data: null, error: 'CloudVirtualMachineZone not found' }
+    }
+
+    const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
         .findOne({
-            sealosRegionUid: region.sealosRegionUid,
-            cloudProvider: region.cloudProvider,
-            cloudProviderZone: 'ap-guangzhou-6',
+            cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+            virtualMachinePackageFamily: body.virtualMachinePackageFamily
+        })
+
+    if (!virtualMachinePackageFamily) {
+        return { data: null, error: 'virtualMachinePackageFamily not found' }
+    }
+
+    const virtualMachinePackage = await db.collection<VirtualMachinePackage>('VirtualMachinePackage')
+        .findOne({
             virtualMachinePackageName: body.virtualMachinePackageName,
-            virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+            virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
             chargeType: ChargeType.PostPaidByHour
         })
 
@@ -113,7 +129,7 @@ export default async function (ctx: FunctionContext) {
                 sealosUserUid: ok.sealosUserUid,
                 sealosRegionDomain: region.sealosRegionDomain,
                 sealosRegionUid: region.sealosRegionUid,
-                regionId: region._id,
+                region: region.name,
                 cpu: instanceConfigInfo.Cpu,
                 memory: instanceConfigInfo.Memory,
                 gpu: instanceConfigInfo.Gpu,
@@ -124,8 +140,9 @@ export default async function (ctx: FunctionContext) {
                 instanceName: instanceName,
                 loginPassword: body.loginPassword,
                 cloudProvider: VmVendors.Tencent,
-                cloudProviderVirtualMachinePackageFamily: virtualMachinePackage.cloudProviderVirtualMachinePackageFamily,
-                cloudProviderVirtualMachinePackageName: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
+                cloudProviderZone: cloudVirtualMachineZone.cloudProviderZone,
+                virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+                virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
                 chargeType: ChargeType.PostPaidByHour,
                 createTime: new Date(),
                 updateTime: new Date(),
@@ -138,7 +155,7 @@ export default async function (ctx: FunctionContext) {
                     ],
                     InstanceChargeType: 'POSTPAID_BY_HOUR',
                     Placement: {
-                        Zone: 'ap-guangzhou-6',
+                        Zone: zone,
                         ProjectId: 1311479,
                     },
                     InstanceType: virtualMachinePackage.cloudProviderVirtualMachinePackageName,

@@ -1,7 +1,7 @@
 import { validateDTO, verifyBearerToken } from '../utils'
 import { VmVendors, getVmVendor } from '../type'
 import { db } from '../db'
-import { Region, TencentCloudVirtualMachine } from '../entity'
+import { CloudVirtualMachine, Region, TencentCloudVirtualMachine } from '../entity'
 interface IRequestBody {
     page: number
     pageSize: number
@@ -10,6 +10,15 @@ interface IRequestBody {
 const iRequestBodySchema = {
     page: value => typeof value === 'number' && value > 0 && Number.isInteger(value),
     pageSize: value => typeof value === 'number' && value > 0 && Number.isInteger(value)
+}
+interface IResponse {
+    data: {
+        list: CloudVirtualMachine[]
+        total: number
+        page: number
+        pageSize: number
+    }
+    error: Error
 }
 
 export default async function (ctx: FunctionContext) {
@@ -52,6 +61,11 @@ export default async function (ctx: FunctionContext) {
                 ).limit(body.pageSize)
                 .toArray()
 
+            tencentMachineList.forEach(machine => {
+                if ('InstanceType' in machine.metaData) {
+                    delete machine.metaData.InstanceType
+                }
+            })
 
             const data = {
                 list: tencentMachineList,
@@ -60,11 +74,12 @@ export default async function (ctx: FunctionContext) {
                 pageSize: body.pageSize
             }
 
-            return {
+            const response: IResponse = {
                 data: data,
                 error: null
             }
 
+            return response
         default:
             throw new Error(`Unsupported Vendor type: ${vendorType}`)
     }

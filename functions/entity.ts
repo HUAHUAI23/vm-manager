@@ -70,11 +70,12 @@ export class CloudVirtualMachine {
   loginPort?: number
 
   cloudProvider: VmVendors
+  cloudProviderZone: string
   sealosRegionUid: string
   sealosRegionDomain: string
-  regionId: ObjectId
-  cloudProviderVirtualMachinePackageName: string
-  cloudProviderVirtualMachinePackageFamily: string
+  region: string
+  virtualMachinePackageFamily: string
+  virtualMachinePackageName: string
   changeType?: ChangeType
   chargeType: ChargeType
   // 创建时间
@@ -131,34 +132,31 @@ export class TencentCloudVirtualMachine extends CloudVirtualMachine {
 
 export class Region {
   _id?: ObjectId
+  name: string
   sealosRegionUid: string
   sealosRegionDomain: string
   // sealos 所在云服务商
   cloudProvider: VmVendors
   // sealos k8s 所在云服务商的可用区
-  cloudProviderZone: string
+  cloudProviderZone: string[]
 }
 export class CloudVirtualMachineZone {
   _id?: ObjectId
   regionId: ObjectId
   cloudProviderZone: string
 }
-export class VirtualMachinePackageType {
-  _id: ObjectId
+export class VirtualMachinePackageFamily {
+  _id?: ObjectId
+  // 云厂商每一个 zone 有不同的套餐类型
   cloudVirtualMachineZoneId: ObjectId
-  cloudProviderPrincePackageType: string
-  sealosType: string
+  cloudProviderVirtualMachinePackageFamily: string
+  virtualMachinePackageFamily: string
 }
 
-export class VirtualMachinePackageList {
+export class VirtualMachinePackage {
   _id?: ObjectId
-  virtualMachinePackageFamily: string
+  virtualMachinePackageFamilyId: ObjectId
   virtualMachinePackageName: string
-  sealosRegionUid: string
-  sealosRegionDomain: string
-  cloudProvider: VmVendors
-  cloudProviderZone: string
-  cloudProviderVirtualMachinePackageFamily: string
   cloudProviderVirtualMachinePackageName: string
   instancePrice: number
   diskPerG: number
@@ -177,10 +175,15 @@ export class CloudVirtualMachineBilling {
   _id?: ObjectId
   instanceName: string
   namespace: string
-  virtualMachinePackageId: ObjectId
   startAt: Date
   endAt: Date
+  virtualMachinePackageFamily: string
+  virtualMachinePackageName: string
+  cloudProviderVirtualMachinePackageFamily: string
+  cloudProviderVirtualMachinePackageName: string
+  cloudProviderZone: string
   cloudProvider: VmVendors
+  region: string
   sealosUserId: string
   sealosUserUid: string
   sealosRegionUid: string

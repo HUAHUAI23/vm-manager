@@ -1,7 +1,7 @@
 import { validateDTO, verifyBearerToken } from '../utils'
 import { db } from '../db'
 const Decimal = require('decimal.js')
-import { ChargeType, Region, VirtualMachinePackageList } from '../entity'
+import { ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
 
 interface IRequestBody {
   virtualMachinePackageName: string
@@ -55,19 +55,35 @@ export default async function (ctx: FunctionContext) {
     return { data: null, error: 'Region not found' }
   }
 
-  const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList')
+  const zone = 'ap-guangzhou-6'
+  const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
+    .findOne({ regionId: region._id, cloudProviderZone: zone })
+
+  if (!cloudVirtualMachineZone) {
+    return { data: null, error: 'CloudVirtualMachineZone not found' }
+  }
+
+  const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
-      sealosRegionUid: region.sealosRegionUid,
-      cloudProvider: region.cloudProvider,
-      cloudProviderZone: 'ap-guangzhou-6',
+      cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+      virtualMachinePackageFamily: body.virtualMachinePackageFamily
+    })
+
+  if (!virtualMachinePackageFamily) {
+    return { data: null, error: 'virtualMachinePackageFamily not found' }
+  }
+
+  const virtualMachinePackage = await db.collection<VirtualMachinePackage>('VirtualMachinePackage')
+    .findOne({
       virtualMachinePackageName: body.virtualMachinePackageName,
-      virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+      virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
       chargeType: ChargeType.PostPaidByHour
     })
 
   if (!virtualMachinePackage) {
     return { data: null, error: 'virtualMachinePackage not found' }
   }
+
   const price: IResponse = {
     instancePrice: 0,
     diskPrice: 0,

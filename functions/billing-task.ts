@@ -1,12 +1,12 @@
 import { db, client } from './db'
-import { ChargeType, CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, Phase, State, VirtualMachinePackageList } from './entity'
+import { ChargeType, CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, CloudVirtualMachineZone, Phase, Region, State, VirtualMachinePackage, VirtualMachinePackageFamily } from './entity'
 import { TASK_LOCK_INIT_TIME } from './constants'
 import { Cron } from "croner"
 import { BillingJob, getSealosUserAccount } from './utils'
 import { Decimal } from 'decimal.js'
 import { billingLockTimeOut, billingInterval } from './constants'
 
-// todo 添加欠费删除与欠费关机逻辑
+// todo 添加欠费删除与欠费关机逻辑 欠费标识
 
 async function tick() {
   await handleCloudVirtualMachineBillingCreating()
@@ -61,22 +61,47 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   latestBillingTime.setSeconds(0)
   latestBillingTime.setMilliseconds(0)
 
-  const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList')
+
+  const region = await db.collection<Region>('Region').findOne({ name: cloudVirtualMachine.region })
+  if (!region) {
+    throw new Error('region not found')
+  }
+
+  const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
+    .findOne({ regionId: region._id, cloudProviderZone: cloudVirtualMachine.cloudProviderZone })
+  if (!cloudVirtualMachineZone) {
+    throw new Error('cloudVirtualMachineZone not found')
+  }
+
+  const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
-      sealosRegionUid: cloudVirtualMachine.sealosRegionUid,
-      cloudProvider: cloudVirtualMachine.cloudProvider,
-      cloudProviderVirtualMachinePackageFamily: cloudVirtualMachine.cloudProviderVirtualMachinePackageFamily,
-      cloudProviderVirtualMachinePackageName: cloudVirtualMachine.cloudProviderVirtualMachinePackageName,
+      cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+      virtualMachinePackageFamily: cloudVirtualMachine.virtualMachinePackageFamily
+    })
+  if (!virtualMachinePackageFamily) {
+    throw new Error('virtualMachinePackageFamily not found')
+  }
+
+  const virtualMachinePackage = await db.collection<VirtualMachinePackage>('VirtualMachinePackage')
+    .findOne({
+      virtualMachinePackageName: cloudVirtualMachine.virtualMachinePackageName,
+      virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
       chargeType: ChargeType.PostPaidByHour
     })
+
 
   const cloudVirtualMachineBilling: CloudVirtualMachineBilling = {
     instanceName: cloudVirtualMachine.instanceName,
     namespace: cloudVirtualMachine.namespace,
-    virtualMachinePackageId: virtualMachinePackage._id,
     startAt: latestBillingTime,
     endAt: new Date(latestBillingTime.getTime() + billingInterval),
+    virtualMachinePackageFamily: virtualMachinePackageFamily.virtualMachinePackageFamily,
+    virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
+    cloudProviderVirtualMachinePackageFamily: virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
+    cloudProviderVirtualMachinePackageName: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
+    cloudProviderZone: cloudVirtualMachine.cloudProviderZone,
     cloudProvider: cloudVirtualMachine.cloudProvider,
+    region: cloudVirtualMachine.region,
     sealosUserId: cloudVirtualMachine.sealosUserId,
     sealosUserUid: cloudVirtualMachine.sealosUserUid,
     sealosRegionUid: cloudVirtualMachine.sealosRegionUid,
@@ -150,6 +175,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
 
   const session = client.startSession()
   try {
+    session.startTransaction()
     const res = await db.collection<CloudVirtualMachineBilling>('CloudVirtualMachineBilling')
       .insertOne(cloudVirtualMachineBilling, { session })
 
@@ -172,7 +198,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     throw error
   } finally {
     console.log('hello test')
-    session.endSession()
+    await session.endSession()
   }
 }
 
@@ -182,7 +208,7 @@ billingJob.schedule(() => {
 })
 billingJob.resume()
 
-export function getCloudVirtualMachineOneHourFee(virtualMachinePackage: VirtualMachinePackageList, internetMaxBandwidthOut: number, diskSize: number) {
+export function getCloudVirtualMachineOneHourFee(virtualMachinePackage: VirtualMachinePackage, internetMaxBandwidthOut: number, diskSize: number) {
   let instancePrice = new Decimal(virtualMachinePackage.instancePrice)
 
   let diskPrice = new Decimal(virtualMachinePackage.diskPerG)

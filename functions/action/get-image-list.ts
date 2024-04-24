@@ -5,7 +5,7 @@ import { db } from '../db'
 
 
 
-
+// todo 返回数据处理
 export default async function (ctx: FunctionContext) {
     const ok = verifyBearerToken(ctx.headers.authorization)
 

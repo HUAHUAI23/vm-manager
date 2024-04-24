@@ -1,6 +1,6 @@
 import { VmVendors, getVmVendor } from '../type'
 import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
-import { ChargeType, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackageList } from '../entity'
+import { ChargeType, CloudVirtualMachineZone, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
 import { db } from '../db'
 import { TencentVm } from './tencent/tencent-vm'
 import { getCloudVirtualMachineOneHourFee } from '../billing-task'
@@ -50,13 +50,27 @@ export default async function (ctx: FunctionContext) {
                 return { data: null, error: 'Virtual Machine not found' }
             }
 
-            const virtualMachinePackage = await db.collection<VirtualMachinePackageList>('VirtualMachinePackageList')
+            const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
+                .findOne({ regionId: region._id, cloudProviderZone: tencentVm.cloudProviderZone })
+
+            if (!cloudVirtualMachineZone) {
+                return { data: null, error: 'CloudVirtualMachineZone not found' }
+            }
+
+            const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
                 .findOne({
-                    sealosRegionUid: region.sealosRegionUid,
-                    cloudProvider: region.cloudProvider,
-                    cloudProviderZone: 'ap-guangzhou-6',
-                    cloudProviderVirtualMachinePackageName: tencentVm.cloudProviderVirtualMachinePackageName,
-                    cloudProviderVirtualMachinePackageFamily: tencentVm.cloudProviderVirtualMachinePackageFamily,
+                    cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+                    virtualMachinePackageFamily: tencentVm.virtualMachinePackageFamily
+                })
+
+            if (!virtualMachinePackageFamily) {
+                return { data: null, error: 'virtualMachinePackageFamily not found' }
+            }
+
+            const virtualMachinePackage = await db.collection<VirtualMachinePackage>('VirtualMachinePackage')
+                .findOne({
+                    virtualMachinePackageName: tencentVm.virtualMachinePackageName,
+                    virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
                     chargeType: ChargeType.PostPaidByHour
                 })
 

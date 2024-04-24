@@ -12,6 +12,7 @@ import { handlerChangeEvents } from './handler/change-events'
 import { stateChangeLockTime } from './constants'
 import { Cron } from "croner"
 
+// todo 锁随机性处理
 // 创建事件发射器
 const eventEmitter = new EventEmitter()
 
@@ -27,7 +28,7 @@ const EVENT_DELETE = 'delete'
 async function reconcileState() {
     try {
         const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
-
+        // 随机性处理
         // 创建
         const create = await collection.findOneAndUpdate({
             lockedAt: {
