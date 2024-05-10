@@ -2,7 +2,7 @@ import { db } from "../db"
 import { TencentVmOperation } from "../sdk/tencent/tencent-sdk"
 import { VmVendors, getVmVendor } from "../type"
 import { verifyBearerToken } from "../utils"
-import { ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily } from "../entity"
+import { Arch, BandwidthPricingTier, ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType } from "../entity"
 import { InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 
 interface IResponse {
@@ -12,6 +12,8 @@ interface IResponse {
 interface IRequestBody {
     zone: string
     virtualMachinePackageFamily: string
+    virtualMachineArch: Arch
+    virtualMachineType: VirtualMachineType
     chargeType: ChargeType
 }
 
@@ -28,9 +30,7 @@ interface sealosVirtualMachinePackage {
     virtualMachinePackageName: string
     instancePrice: number
     diskPerG: number
-    networkSpeedBoundary: number
-    networkSpeedUnderSpeedBoundary: number
-    networkSpeedAboveSpeedBoundary: number
+    bandwidthPricingTiers: BandwidthPricingTier[]
     chargeType: ChargeType
     status: Status
 }
@@ -51,9 +51,7 @@ function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackage[],
             virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
             instancePrice: virtualMachinePackage.instancePrice,
             diskPerG: virtualMachinePackage.diskPerG,
-            networkSpeedBoundary: virtualMachinePackage.networkSpeedBoundary,
-            networkSpeedUnderSpeedBoundary: virtualMachinePackage.networkSpeedUnderSpeedBoundary,
-            networkSpeedAboveSpeedBoundary: virtualMachinePackage.networkSpeedAboveSpeedBoundary,
+            bandwidthPricingTiers: virtualMachinePackage.bandwidthPricingTiers,
             chargeType: virtualMachinePackage.chargeType,
             status: matchedInstanceType.Status === "SELL" ? Status.Available : Status.Unavailable
 
@@ -81,33 +79,38 @@ export default async function (ctx: FunctionContext) {
 
     const vendorType = getVmVendor(region.cloudProvider)
 
+    const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
+        .findOne({ regionId: region._id, name: body.zone })
+
+    if (!cloudVirtualMachineZone) {
+        return { data: null, error: 'CloudVirtualMachineZone not found' }
+    }
+
+    const chargeType = ChargeType.PostPaidByHour
+    const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
+        .findOne({
+            cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+            virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+            virtualMachineType: body.virtualMachineType,
+            virtualMachineArch: body.virtualMachineArch,
+            chargeType: chargeType
+        })
+
+    if (!virtualMachinePackageFamily) {
+        return { data: null, error: 'virtualMachinePackageFamily not found' }
+    }
+
     switch (vendorType) {
         case VmVendors.Tencent:
             const vmTypeList = await
-                TencentVmOperation.describeZoneInstanceConfigInfos()
-
-
-            const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-                .findOne({ regionId: region._id, cloudProviderZone: body.zone })
-
-            if (!cloudVirtualMachineZone) {
-                return { data: null, error: 'CloudVirtualMachineZone not found' }
-            }
-
-            const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
-                .findOne({
-                    cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
-                    virtualMachinePackageFamily: body.virtualMachinePackageFamily
-                })
-
-            if (!virtualMachinePackageFamily) {
-                return { data: null, error: 'virtualMachinePackageFamily not found' }
-            }
+                TencentVmOperation.describeZoneInstanceConfigInfos(cloudVirtualMachineZone.cloudProviderZone,
+                    virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
+                    chargeType)
 
             const virtualMachinePackageList = await db.collection<VirtualMachinePackage>('VirtualMachinePackage').
                 find({
                     virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-                    chargeType: body.chargeType
+                    chargeType: chargeType
                 }).toArray()
 
             const sealosVirtualMachineList: sealosVirtualMachinePackage[] =

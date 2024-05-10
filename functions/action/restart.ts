@@ -1,6 +1,6 @@
 import { VmVendors, getVmVendor } from '../type'
 import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
-import { ChargeType, CloudVirtualMachineZone, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
+import {  CloudVirtualMachineZone, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
 import { db } from '../db'
 import { TencentVm } from './tencent/tencent-vm'
 import { getCloudVirtualMachineOneHourFee } from '../billing-task'
@@ -51,7 +51,7 @@ export default async function (ctx: FunctionContext) {
             }
 
             const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-                .findOne({ regionId: region._id, cloudProviderZone: tencentVm.cloudProviderZone })
+                .findOne({ regionId: region._id, _id: tencentVm.zoneId })
 
             if (!cloudVirtualMachineZone) {
                 return { data: null, error: 'CloudVirtualMachineZone not found' }
@@ -59,8 +59,8 @@ export default async function (ctx: FunctionContext) {
 
             const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
                 .findOne({
-                    cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
-                    virtualMachinePackageFamily: tencentVm.virtualMachinePackageFamily
+                    cloudVirtualMachineZoneId: tencentVm.zoneId,
+                    _id: tencentVm.virtualMachinePackageFamilyId
                 })
 
             if (!virtualMachinePackageFamily) {
@@ -71,7 +71,7 @@ export default async function (ctx: FunctionContext) {
                 .findOne({
                     virtualMachinePackageName: tencentVm.virtualMachinePackageName,
                     virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-                    chargeType: ChargeType.PostPaidByHour
+                    chargeType: tencentVm.chargeType
                 })
 
             const cloudVirtualMachineOneHourFee = getCloudVirtualMachineOneHourFee(

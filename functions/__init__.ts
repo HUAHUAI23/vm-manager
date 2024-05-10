@@ -42,10 +42,12 @@ async function createRegionAndZone() {
         {
           regionId: gzg._id,
           cloudProviderZone: 'ap-guangzhou-6',
+          name: 'Guangzhou-6'
         },
         {
           regionId: gzg._id,
           cloudProviderZone: 'ap-guangzhou-7',
+          name: 'Guangzhou-7'
         },
 
       ], { session }
@@ -61,6 +63,20 @@ async function createRegionAndZone() {
       { session }
     )
 
+    const BandwidthPricingTierList = [
+      {
+        minBandwidth: 0,
+        maxBandwidth: 5,
+        pricePerMbps: 0.05,
+      },
+
+      {
+        minBandwidth: 5,
+        maxBandwidth: null,
+        pricePerMbps: 0.2,
+      }
+    ]
+
     const virtualMachinePackageFamily: VirtualMachinePackageFamily[] = [
       // guangzhou6
       // x86 计算
@@ -71,6 +87,7 @@ async function createRegionAndZone() {
         virtualMachinePackageFamily: 'A',
         virtualMachineArch: Arch.X86_64,
         virtualMachineType: VirtualMachineType.CostEffective,
+        chargeType: ChargeType.PostPaidByHour
       },
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
@@ -78,6 +95,7 @@ async function createRegionAndZone() {
         virtualMachinePackageFamily: 'B',
         virtualMachineArch: Arch.X86_64,
         virtualMachineType: VirtualMachineType.CostEffective,
+        chargeType: ChargeType.PostPaidByHour
       },
       // 异构计算
       // GPU
@@ -87,6 +105,7 @@ async function createRegionAndZone() {
         virtualMachinePackageFamily: 'A',
         virtualMachineArch: Arch.Heterogeneous,
         virtualMachineType: VirtualMachineType.GPU,
+        chargeType: ChargeType.PostPaidByHour
       },
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
@@ -94,6 +113,7 @@ async function createRegionAndZone() {
         virtualMachinePackageFamily: 'B',
         virtualMachineArch: Arch.Heterogeneous,
         virtualMachineType: VirtualMachineType.GPU,
+        chargeType: ChargeType.PostPaidByHour
       },
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
@@ -101,6 +121,7 @@ async function createRegionAndZone() {
         virtualMachinePackageFamily: 'C',
         virtualMachineArch: Arch.Heterogeneous,
         virtualMachineType: VirtualMachineType.GPU,
+        chargeType: ChargeType.PostPaidByHour
       },
 
       // guangzhou7
@@ -143,9 +164,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM4',
         instancePrice: 0.15,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -154,9 +173,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM8',
         instancePrice: 0.22,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -165,9 +182,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.LARGE8',
         instancePrice: 0.3,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -176,9 +191,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.LARGE16',
         instancePrice: 0.45,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -187,9 +200,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.2XLARGE16',
         instancePrice: 0.6,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -198,9 +209,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.2XLARGE32',
         instancePrice: 0.9,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -209,9 +218,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.4XLARGE32',
         instancePrice: 1.2,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -220,9 +227,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.4XLARGE64',
         instancePrice: 1.79,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -231,9 +236,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.8XLARGE64',
         instancePrice: 2.39,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -242,9 +245,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TS5.8XLARGE128',
         instancePrice: 3.59,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       // TM5
@@ -254,9 +255,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TM5.2XLARGE64',
         instancePrice: 2.2,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -265,9 +264,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TM5.4XLARGE128',
         instancePrice: 4.4,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       {
@@ -276,9 +273,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'TM5.8XLARGE256',
         instancePrice: 8.8,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       //GNV4
@@ -288,9 +283,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'GNV4.3XLARGE44',
         instancePrice: 9.2,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       // GN7
@@ -300,9 +293,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'GN7.2XLARGE32',
         instancePrice: 8.7,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
       // GN10Xp
@@ -312,9 +303,7 @@ async function createRegionAndZone() {
         cloudProviderVirtualMachinePackageName: 'GN10Xp.2XLARGE40',
         instancePrice: 12,
         diskPerG: 0.0008,
-        networkSpeedBoundary: 5,
-        networkSpeedUnderSpeedBoundary: 0.05,
-        networkSpeedAboveSpeedBoundary: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
       },
     ]

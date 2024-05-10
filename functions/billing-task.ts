@@ -1,5 +1,5 @@
 import { db, client } from './db'
-import { ChargeType, CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState,  Phase,  State, VirtualMachinePackage, VirtualMachinePackageFamily } from './entity'
+import { CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, Phase, State, VirtualMachinePackage, VirtualMachinePackageFamily, getPriceForBandwidth } from './entity'
 import { TASK_LOCK_INIT_TIME } from './constants'
 import { Cron } from "croner"
 import { BillingJob, getSealosUserAccount } from './utils'
@@ -65,7 +65,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
       cloudVirtualMachineZoneId: cloudVirtualMachine.zoneId,
-      virtualMachinePackageFamily: cloudVirtualMachine.virtualMachinePackageFamily
+      _id: cloudVirtualMachine.virtualMachinePackageFamilyId
     })
 
   if (!virtualMachinePackageFamily) {
@@ -76,33 +76,39 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     .findOne({
       virtualMachinePackageName: cloudVirtualMachine.virtualMachinePackageName,
       virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-      chargeType: ChargeType.PostPaidByHour
+      chargeType: cloudVirtualMachine.chargeType
     })
 
 
   const cloudVirtualMachineBilling: CloudVirtualMachineBilling = {
-    instanceName: cloudVirtualMachine.instanceName,
+    sealosUserId: cloudVirtualMachine.sealosUserId,
+    sealosUserUid: cloudVirtualMachine.sealosUserUid,
+    sealosRegionUid: cloudVirtualMachine.sealosRegionUid,
+    sealosRegionDomain: cloudVirtualMachine.sealosRegionDomain,
+    sealosNamespace: cloudVirtualMachine.sealosNamespace,
+
     namespace: cloudVirtualMachine.sealosNamespace,
-    startAt: latestBillingTime,
-    endAt: new Date(latestBillingTime.getTime() + billingInterval),
-    virtualMachinePackageFamily: virtualMachinePackageFamily.virtualMachinePackageFamily,
+    instanceName: cloudVirtualMachine.instanceName,
+    region: cloudVirtualMachine.region,
+    zoneId: cloudVirtualMachine.zoneId,
+    zoneName:cloudVirtualMachine.zoneName,
+
+    virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
     virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
     cloudProviderVirtualMachinePackageFamily: virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
     cloudProviderVirtualMachinePackageName: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
     cloudProviderZone: cloudVirtualMachine.cloudProviderZone,
     cloudProvider: cloudVirtualMachine.cloudProvider,
-    zoneId: cloudVirtualMachine.zoneId,
-    sealosUserId: cloudVirtualMachine.sealosUserId,
-    sealosUserUid: cloudVirtualMachine.sealosUserUid,
-    sealosRegionUid: cloudVirtualMachine.sealosRegionUid,
-    sealosRegionDomain: cloudVirtualMachine.sealosRegionDomain,
-    amount: 0,
     detail: {
       instance: 0,
       network: 0,
       disk: 0
     },
-    state: CloudVirtualMachineBillingState.Pending
+    startAt: latestBillingTime,
+    endAt: new Date(latestBillingTime.getTime() + billingInterval),
+    amount: 0,
+    state: CloudVirtualMachineBillingState.Pending,
+    chargeType: cloudVirtualMachine.chargeType
   }
 
 
@@ -111,15 +117,12 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   let diskPrice = new Decimal(virtualMachinePackage.diskPerG)
     .mul(new Decimal(cloudVirtualMachine.disk))
 
-  let networkPrice = new Decimal(0)
+  const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, cloudVirtualMachine.internetMaxBandwidthOut)
 
-  if (cloudVirtualMachine.internetMaxBandwidthOut > virtualMachinePackage.networkSpeedBoundary) {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundary)
-      .mul(new Decimal(cloudVirtualMachine.internetMaxBandwidthOut))
-  } else {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundary)
-      .mul(new Decimal(cloudVirtualMachine.internetMaxBandwidthOut))
-  }
+
+  let networkPrice = new Decimal(networkPricePerMbps)
+    .mul(new Decimal(cloudVirtualMachine.internetMaxBandwidthOut))
+
 
   if (cloudVirtualMachine.phase === Phase.Stopped) {
     instancePrice = new Decimal(0)
@@ -204,15 +207,12 @@ export function getCloudVirtualMachineOneHourFee(virtualMachinePackage: VirtualM
   let diskPrice = new Decimal(virtualMachinePackage.diskPerG)
     .mul(new Decimal(diskSize))
 
-  let networkPrice = new Decimal(0)
+  const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, internetMaxBandwidthOut)
+  let networkPrice =
+    new Decimal(networkPricePerMbps)
+      .mul(new Decimal(internetMaxBandwidthOut))
 
-  if (internetMaxBandwidthOut > virtualMachinePackage.networkSpeedBoundary) {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundary)
-      .mul(new Decimal(internetMaxBandwidthOut))
-  } else {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundary)
-      .mul(new Decimal(internetMaxBandwidthOut))
-  }
+
 
   const totalAmount = instancePrice.plus(networkPrice)
     .plus(diskPrice).toNumber()

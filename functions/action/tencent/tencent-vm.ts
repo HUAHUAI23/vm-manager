@@ -5,6 +5,7 @@ export class TencentVm {
   static async create(vm: TencentCloudVirtualMachine): Promise<void> {
     await db.collection<CloudVirtualMachine>('CloudVirtualMachine').insertOne(vm)
   }
+
   // Todo findOneAndUpdate 设计思路文档补充
   static async start(tencentVm: TencentCloudVirtualMachine): Promise<boolean> {
 

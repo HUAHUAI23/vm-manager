@@ -1,6 +1,7 @@
 
 import { Instance, InstanceTypeConfig, InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 import * as tencentcloud from "tencentcloud-sdk-nodejs"
+import { ChargeType } from "@/entity"
 
 // 导入对应产品模块的client models。
 const CvmClient = tencentcloud.cvm.v20170312.Client
@@ -174,19 +175,31 @@ export class TencentVmOperation {
         const res = await TencentVmOperation.client.DescribeInstanceTypeConfigs(params)
         return res.InstanceTypeConfigSet[0]
     }
-    static async describeZoneInstanceConfigInfo(instanceType: string): Promise<InstanceTypeQuotaItem> {
+    static async describeZoneInstanceConfigInfo(zone: string, instanceFamily: string, instanceType: string, chargeType: string): Promise<InstanceTypeQuotaItem> {
+        let instanceChargeType
+
+        if (chargeType === ChargeType.PrePaid) {
+            instanceChargeType = "PREPAID"
+        }
+
+        if (chargeType === ChargeType.PostPaidByHour) {
+            instanceChargeType = 'POSTPAID_BY_HOUR'
+        }
+
+        if (!instanceChargeType) throw new Error('no instanceChargeType value')
+
         const params = {
             "Filters": [
                 {
                     "Name": "zone",
                     "Values": [
-                        "ap-guangzhou-6"
+                        zone
                     ]
                 },
                 {
                     "Name": "instance-family",
                     "Values": [
-                        "TS5"
+                        instanceFamily
                     ]
                 },
                 {
@@ -198,7 +211,7 @@ export class TencentVmOperation {
                 {
                     "Name": "instance-charge-type",
                     "Values": [
-                        "POSTPAID_BY_HOUR"
+                        instanceChargeType
                     ]
                 }
             ]
@@ -207,25 +220,37 @@ export class TencentVmOperation {
         return res.InstanceTypeQuotaSet[0]
     }
 
-    static async describeZoneInstanceConfigInfos(): Promise<InstanceTypeQuotaItem[]> {
+    static async describeZoneInstanceConfigInfos(zone: string, instanceFamily: string, chargeType: ChargeType): Promise<InstanceTypeQuotaItem[]> {
+        let instanceChargeType
+
+        if (chargeType === ChargeType.PrePaid) {
+            instanceChargeType = "PREPAID"
+        }
+
+        if (chargeType === ChargeType.PostPaidByHour) {
+            instanceChargeType = 'POSTPAID_BY_HOUR'
+        }
+
+        if (!instanceChargeType) throw new Error('no instanceChargeType value')
+
         const params = {
             "Filters": [
                 {
                     "Name": "zone",
                     "Values": [
-                        "ap-guangzhou-6"
+                        zone
                     ]
                 },
                 {
                     "Name": "instance-family",
                     "Values": [
-                        "TS5"
+                        instanceFamily
                     ]
                 },
                 {
                     "Name": "instance-charge-type",
                     "Values": [
-                        "POSTPAID_BY_HOUR"
+                        instanceChargeType
                     ]
                 }
             ]

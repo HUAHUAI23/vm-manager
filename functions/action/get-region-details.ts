@@ -90,7 +90,7 @@ async function getZoneDetails(zone: CloudVirtualMachineZone) {
     virtualMachineTypes: VirtualMachineType[]
   }
   const zoneDetail: ZoneDetail = {
-    zone: zone.cloudProviderZone,
+    zone: zone.name,
     arch: []
   }
 
