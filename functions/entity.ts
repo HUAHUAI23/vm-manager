@@ -42,13 +42,17 @@ export enum ChangeType {
 }
 export enum ChargeType {
   PostPaidByHour = 'postPaidByHour',
+  PrePaid = 'prePaid'
 }
 
 export class CloudVirtualMachine {
   _id?: ObjectId
+  // name?: string
+  // description: string
   phase: Phase
   state: State
-  namespace: string
+
+  sealosNamespace: string
   sealosUserId: string
   sealosUserUid: string
 
@@ -58,6 +62,8 @@ export class CloudVirtualMachine {
   disk: number
   publicNetworkAccess: boolean
   internetMaxBandwidthOut?: number
+  sealosRegionUid: string
+  sealosRegionDomain: string
 
   privateIpAddresses?: string[]
   publicIpAddresses?: string[]
@@ -71,9 +77,7 @@ export class CloudVirtualMachine {
 
   cloudProvider: VmVendors
   cloudProviderZone: string
-  sealosRegionUid: string
-  sealosRegionDomain: string
-  region: string
+  zoneId: ObjectId
   virtualMachinePackageFamily: string
   virtualMachinePackageName: string
   changeType?: ChangeType
@@ -135,7 +139,7 @@ export class Region {
   name: string
   sealosRegionUid: string
   sealosRegionDomain: string
-  // sealos 所在云服务商
+  // sealos k8s 所在云服务商
   cloudProvider: VmVendors
   // sealos k8s 所在云服务商的可用区
   cloudProviderZone: string[]
@@ -145,12 +149,32 @@ export class CloudVirtualMachineZone {
   regionId: ObjectId
   cloudProviderZone: string
 }
+
+export enum Arch {
+  X86_64 = 'x86_64',
+  AArch64 = 'aarch64',
+  Heterogeneous = 'heterogeneous', // 异构计算
+  BareMetal = 'bareMetal', // 裸金属云服务器
+}
+
+export enum VirtualMachineType {
+  General = 'general',
+  GPU = 'gpu',
+  NPU = 'npu',
+  HighPerformance = 'highPerformance',
+  HighIO = 'highIO',
+  HighMemory = 'highMemory',
+  CostEffective = 'costEffective'
+}
+
 export class VirtualMachinePackageFamily {
   _id?: ObjectId
   // 云厂商每一个 zone 有不同的套餐类型
   cloudVirtualMachineZoneId: ObjectId
   cloudProviderVirtualMachinePackageFamily: string
   virtualMachinePackageFamily: string
+  virtualMachineType: VirtualMachineType
+  virtualMachineArch: Arch
 }
 
 export class VirtualMachinePackage {
@@ -161,8 +185,8 @@ export class VirtualMachinePackage {
   instancePrice: number
   diskPerG: number
   networkSpeedBoundary: number
-  networkSpeedUnderSpeedBoundaryPerHour: number
-  networkSpeedAboveSpeedBoundaryPerHour: number
+  networkSpeedUnderSpeedBoundary: number
+  networkSpeedAboveSpeedBoundary: number
   chargeType: ChargeType
 }
 
@@ -171,28 +195,97 @@ export enum CloudVirtualMachineBillingState {
   Done = 'Done',
 }
 
-export class CloudVirtualMachineBilling {
-  _id?: ObjectId
-  instanceName: string
-  namespace: string
-  startAt: Date
-  endAt: Date
-  virtualMachinePackageFamily: string
-  virtualMachinePackageName: string
-  cloudProviderVirtualMachinePackageFamily: string
-  cloudProviderVirtualMachinePackageName: string
-  cloudProviderZone: string
-  cloudProvider: VmVendors
-  region: string
+// export class CloudVirtualMachineBilling {
+//   _id?: ObjectId
+//   instanceName: string
+//   namespace: string
+//   startAt: Date
+//   endAt: Date
+//   virtualMachinePackageFamily: string
+//   virtualMachinePackageName: string
+//   cloudProviderVirtualMachinePackageFamily: string
+//   cloudProviderVirtualMachinePackageName: string
+//   cloudProviderZone: string
+//   cloudProvider: VmVendors
+//   zoneId: ObjectId
+//   sealosUserId: string
+//   sealosUserUid: string
+//   sealosRegionUid: string
+//   sealosRegionDomain: string
+//   amount: number
+//   detail: {
+//     instance: number
+//     network: number
+//     disk: number
+//   }
+//   state: CloudVirtualMachineBillingState
+// }
+
+enum RenewalPlan {
+  Manual = 'Manual',
+  Auto = 'Auto'
+}
+
+enum SubscriptionState {
+  Done = 'Done',
+  Pending = 'Pending',
+}
+export class CloudVirtualMachineSubscription {
+  id?: string
   sealosUserId: string
   sealosUserUid: string
   sealosRegionUid: string
   sealosRegionDomain: string
-  amount: number
+  sealosNamespace: string
+  instanceName: string
+  virtualMachinePackageFamily: string
+  virtualMachinePackageName: string
+  cloudProviderVirtualMachinePackageFamily: string
+  cloudProviderVirtualMachinePackageName: string
+  zoneId: string
+  cloudProviderZone: string
+  cloudProvider: VmVendors
   detail: {
     instance: number
     network: number
     disk: number
   }
+  renewalPlan: RenewalPlan
+  state: SubscriptionState
+  createTime: Date
+  updateTime: Date
+  expireTime: Date
+  subscriptionDuration: number
+}
+
+enum BillingType {
+  Subscription = "Subscription",
+  PayByHour = "payByHour"
+}
+export class CloudVirtualMachineBilling {
+  id?: string
+  sealosUserId: string
+  sealosUserUid: string
+  sealosRegionUid: string
+  sealosRegionDomain: string
+  sealosNamespace: string
+  instanceName: string
+  virtualMachinePackageFamily: string
+  virtualMachinePackageName: string
+  cloudProviderVirtualMachinePackageFamily: string
+  cloudProviderVirtualMachinePackageName: string
+  zoneId: string
+  cloudProviderZone: string
+  cloudProvider: VmVendors
+  detail: {
+    instance: number
+    network: number
+    disk: number
+  }
+  startAt: Date
+  endAt: Date
+  amount: number
   state: CloudVirtualMachineBillingState
+  billingType: BillingType
+  subscriptionId: string
 }

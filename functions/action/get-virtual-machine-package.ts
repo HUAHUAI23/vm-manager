@@ -9,6 +9,12 @@ interface IResponse {
     data: sealosVirtualMachinePackage[]
     error: Error
 }
+interface IRequestBody {
+    zone: string
+    virtualMachinePackageFamily: string
+    chargeType: ChargeType
+}
+
 enum Status {
     Available = 'available',
     Unavailable = 'unavailable'
@@ -23,12 +29,11 @@ interface sealosVirtualMachinePackage {
     instancePrice: number
     diskPerG: number
     networkSpeedBoundary: number
-    networkSpeedUnderSpeedBoundaryPerHour: number
-    networkSpeedAboveSpeedBoundaryPerHour: number
+    networkSpeedUnderSpeedBoundary: number
+    networkSpeedAboveSpeedBoundary: number
+    chargeType: ChargeType
     status: Status
 }
-const zone = 'ap-guangzhou-6'
-const family = 'A'
 
 function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackage[], virtualMachinePackageFamilyName: string, instanceTypes: InstanceTypeQuotaItem[]): sealosVirtualMachinePackage[] {
     return virtualMachinePackages.map(virtualMachinePackage => {
@@ -47,9 +52,11 @@ function tencentMapAndTransform(virtualMachinePackages: VirtualMachinePackage[],
             instancePrice: virtualMachinePackage.instancePrice,
             diskPerG: virtualMachinePackage.diskPerG,
             networkSpeedBoundary: virtualMachinePackage.networkSpeedBoundary,
-            networkSpeedUnderSpeedBoundaryPerHour: virtualMachinePackage.networkSpeedUnderSpeedBoundaryPerHour,
-            networkSpeedAboveSpeedBoundaryPerHour: virtualMachinePackage.networkSpeedAboveSpeedBoundaryPerHour,
+            networkSpeedUnderSpeedBoundary: virtualMachinePackage.networkSpeedUnderSpeedBoundary,
+            networkSpeedAboveSpeedBoundary: virtualMachinePackage.networkSpeedAboveSpeedBoundary,
+            chargeType: virtualMachinePackage.chargeType,
             status: matchedInstanceType.Status === "SELL" ? Status.Available : Status.Unavailable
+
         }
 
     })
@@ -63,6 +70,8 @@ export default async function (ctx: FunctionContext) {
     if (!ok) {
         return { data: null, error: 'Unauthorized' }
     }
+    const body: IRequestBody = ctx.request.body
+
 
     const region = await db.collection<Region>('Region').findOne({ sealosRegionUid: ok.sealosRegionUid })
 
@@ -79,7 +88,7 @@ export default async function (ctx: FunctionContext) {
 
 
             const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-                .findOne({ regionId: region._id, cloudProviderZone: zone })
+                .findOne({ regionId: region._id, cloudProviderZone: body.zone })
 
             if (!cloudVirtualMachineZone) {
                 return { data: null, error: 'CloudVirtualMachineZone not found' }
@@ -88,7 +97,7 @@ export default async function (ctx: FunctionContext) {
             const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
                 .findOne({
                     cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
-                    virtualMachinePackageFamily: family
+                    virtualMachinePackageFamily: body.virtualMachinePackageFamily
                 })
 
             if (!virtualMachinePackageFamily) {
@@ -98,7 +107,7 @@ export default async function (ctx: FunctionContext) {
             const virtualMachinePackageList = await db.collection<VirtualMachinePackage>('VirtualMachinePackage').
                 find({
                     virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-                    chargeType: ChargeType.PostPaidByHour
+                    chargeType: body.chargeType
                 }).toArray()
 
             const sealosVirtualMachineList: sealosVirtualMachinePackage[] =

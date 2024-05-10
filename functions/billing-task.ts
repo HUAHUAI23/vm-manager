@@ -1,5 +1,5 @@
 import { db, client } from './db'
-import { ChargeType, CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, CloudVirtualMachineZone, Phase, Region, State, VirtualMachinePackage, VirtualMachinePackageFamily } from './entity'
+import { ChargeType, CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState,  Phase,  State, VirtualMachinePackage, VirtualMachinePackageFamily } from './entity'
 import { TASK_LOCK_INIT_TIME } from './constants'
 import { Cron } from "croner"
 import { BillingJob, getSealosUserAccount } from './utils'
@@ -62,22 +62,12 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   latestBillingTime.setMilliseconds(0)
 
 
-  const region = await db.collection<Region>('Region').findOne({ name: cloudVirtualMachine.region })
-  if (!region) {
-    throw new Error('region not found')
-  }
-
-  const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-    .findOne({ regionId: region._id, cloudProviderZone: cloudVirtualMachine.cloudProviderZone })
-  if (!cloudVirtualMachineZone) {
-    throw new Error('cloudVirtualMachineZone not found')
-  }
-
   const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
-      cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
+      cloudVirtualMachineZoneId: cloudVirtualMachine.zoneId,
       virtualMachinePackageFamily: cloudVirtualMachine.virtualMachinePackageFamily
     })
+
   if (!virtualMachinePackageFamily) {
     throw new Error('virtualMachinePackageFamily not found')
   }
@@ -92,7 +82,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
 
   const cloudVirtualMachineBilling: CloudVirtualMachineBilling = {
     instanceName: cloudVirtualMachine.instanceName,
-    namespace: cloudVirtualMachine.namespace,
+    namespace: cloudVirtualMachine.sealosNamespace,
     startAt: latestBillingTime,
     endAt: new Date(latestBillingTime.getTime() + billingInterval),
     virtualMachinePackageFamily: virtualMachinePackageFamily.virtualMachinePackageFamily,
@@ -101,7 +91,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     cloudProviderVirtualMachinePackageName: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
     cloudProviderZone: cloudVirtualMachine.cloudProviderZone,
     cloudProvider: cloudVirtualMachine.cloudProvider,
-    region: cloudVirtualMachine.region,
+    zoneId: cloudVirtualMachine.zoneId,
     sealosUserId: cloudVirtualMachine.sealosUserId,
     sealosUserUid: cloudVirtualMachine.sealosUserUid,
     sealosRegionUid: cloudVirtualMachine.sealosRegionUid,
@@ -124,10 +114,10 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   let networkPrice = new Decimal(0)
 
   if (cloudVirtualMachine.internetMaxBandwidthOut > virtualMachinePackage.networkSpeedBoundary) {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundaryPerHour)
+    networkPrice = new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundary)
       .mul(new Decimal(cloudVirtualMachine.internetMaxBandwidthOut))
   } else {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundaryPerHour)
+    networkPrice = new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundary)
       .mul(new Decimal(cloudVirtualMachine.internetMaxBandwidthOut))
   }
 
@@ -217,10 +207,10 @@ export function getCloudVirtualMachineOneHourFee(virtualMachinePackage: VirtualM
   let networkPrice = new Decimal(0)
 
   if (internetMaxBandwidthOut > virtualMachinePackage.networkSpeedBoundary) {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundaryPerHour)
+    networkPrice = new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundary)
       .mul(new Decimal(internetMaxBandwidthOut))
   } else {
-    networkPrice = new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundaryPerHour)
+    networkPrice = new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundary)
       .mul(new Decimal(internetMaxBandwidthOut))
   }
 

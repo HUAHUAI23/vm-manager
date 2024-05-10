@@ -15,6 +15,7 @@ interface IRequestBody {
     internetMaxBandwidthOut: number
     loginName?: string
     loginPassword: string
+    zone: string
     metaData?: {
         [key: string]: any
     }
@@ -29,6 +30,7 @@ const iRequestBodySchema = {
     internetMaxBandwidthOut: value => typeof value === 'number',
     loginName: value => typeof value === 'string' || value === undefined,
     loginPassword: value => typeof value === 'string',
+    zone: value => typeof value === 'string',
     metaData: value => typeof value === 'object' && value !== null || value === undefined
 }
 
@@ -54,10 +56,9 @@ export default async function (ctx: FunctionContext) {
         return { data: null, error: 'Region not found' }
     }
 
-    const zone = 'ap-guangzhou-6'
 
     const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-        .findOne({ regionId: region._id, cloudProviderZone: zone })
+        .findOne({ regionId: region._id, cloudProviderZone: body.zone })
 
     if (!cloudVirtualMachineZone) {
         return { data: null, error: 'CloudVirtualMachineZone not found' }
@@ -124,12 +125,12 @@ export default async function (ctx: FunctionContext) {
             const tencentCloudVirtualMachine: TencentCloudVirtualMachine = {
                 phase: Phase.Creating,
                 state: State.Running,
-                namespace: ok.namespace,
+                sealosNamespace: ok.namespace,
                 sealosUserId: ok.sealosUserId,
                 sealosUserUid: ok.sealosUserUid,
                 sealosRegionDomain: region.sealosRegionDomain,
                 sealosRegionUid: region.sealosRegionUid,
-                region: region.name,
+                zoneId: cloudVirtualMachineZone._id,
                 cpu: instanceConfigInfo.Cpu,
                 memory: instanceConfigInfo.Memory,
                 gpu: instanceConfigInfo.Gpu,
@@ -143,7 +144,7 @@ export default async function (ctx: FunctionContext) {
                 cloudProviderZone: cloudVirtualMachineZone.cloudProviderZone,
                 virtualMachinePackageFamily: body.virtualMachinePackageFamily,
                 virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
-                chargeType: ChargeType.PostPaidByHour,
+                chargeType: virtualMachinePackage.chargeType,
                 createTime: new Date(),
                 updateTime: new Date(),
                 latestBillingTime: TASK_LOCK_INIT_TIME,
@@ -155,7 +156,7 @@ export default async function (ctx: FunctionContext) {
                     ],
                     InstanceChargeType: 'POSTPAID_BY_HOUR',
                     Placement: {
-                        Zone: zone,
+                        Zone: cloudVirtualMachineZone.cloudProviderZone,
                         ProjectId: 1311479,
                     },
                     InstanceType: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
