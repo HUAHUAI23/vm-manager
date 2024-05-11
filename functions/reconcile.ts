@@ -28,6 +28,7 @@ const EVENT_DELETE = 'delete'
 async function reconcileState() {
     try {
         const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
+        // 这里添加锁 目的是 提供多副本的效率，一次可以执行处理多个
         // 随机性处理
         // 创建
         const createVm = await getRandomReconcileVms(State.Running, [Phase.Creating, Phase.Created])

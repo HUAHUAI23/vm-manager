@@ -68,12 +68,17 @@ export default async function (ctx: FunctionContext) {
 
   for (const zone of zones) {
     const zoneDetail = await getZoneDetails(zone)
+
+    if (zone.name === 'Guangzhou-7') {
+      continue
+    }
+
     postPaidByHourRegionDetail.zone.push(zoneDetail)
     prePaidRegionDetail.zone.push(zoneDetail)
   }
 
   regionList.push(postPaidByHourRegionDetail)
-  regionList.push(prePaidRegionDetail)
+  // regionList.push(prePaidRegionDetail)
 
   const data: IResponse = {
     data: regionList,

@@ -83,7 +83,6 @@ export class CloudVirtualMachine {
 
   cloudProvider: VmVendors
   cloudProviderZone: string
-  sealosZone: string
 
   virtualMachinePackageFamilyId: ObjectId
   virtualMachinePackageName: string

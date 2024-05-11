@@ -82,7 +82,7 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export const ReconcileStateJob = Cron("*/5 * * * * *", {
-    // name: "ReconcileStateJob",
+    name: "ReconcileStateJob",
     catch: true,
     paused: true,
     unref: true,                  // 允许进程在定时器运行时退出（Node.js 和 Deno 环境）
@@ -90,7 +90,7 @@ export const ReconcileStateJob = Cron("*/5 * * * * *", {
 })
 
 export const BillingJob = Cron("0 * * * * *", {
-    // name: "BillingJob",
+    name: "BillingJob",
     catch: true,
     paused: true,
     unref: true,                  // 允许进程在定时器运行时退出（Node.js 和 Deno 环境）

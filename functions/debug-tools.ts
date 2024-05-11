@@ -22,6 +22,7 @@ export default async function (ctx: FunctionContext) {
     case 4:
       resumeJob()
       break
+
     default:
       break
   }

@@ -166,7 +166,6 @@ export default async function (ctx: FunctionContext) {
 
                 cloudProvider: VmVendors.Tencent,
                 cloudProviderZone: cloudVirtualMachineZone.cloudProviderZone,
-                sealosZone: cloudVirtualMachineZone.name,
 
                 virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
                 virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
