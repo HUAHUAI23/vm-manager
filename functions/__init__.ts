@@ -84,7 +84,7 @@ async function createRegionAndZone() {
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
         cloudProviderVirtualMachinePackageFamily: 'TS5',
-        virtualMachinePackageFamily: 'A',
+        virtualMachinePackageFamily: 'highPerformance',
         virtualMachineArch: Arch.X86_64,
         virtualMachineType: VirtualMachineType.CostEffective,
         chargeType: ChargeType.PostPaidByHour
@@ -92,7 +92,7 @@ async function createRegionAndZone() {
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
         cloudProviderVirtualMachinePackageFamily: 'TM5',
-        virtualMachinePackageFamily: 'B',
+        virtualMachinePackageFamily: 'highMemory',
         virtualMachineArch: Arch.X86_64,
         virtualMachineType: VirtualMachineType.CostEffective,
         chargeType: ChargeType.PostPaidByHour
