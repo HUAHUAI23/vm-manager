@@ -102,7 +102,7 @@ async function createRegionAndZone() {
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
         cloudProviderVirtualMachinePackageFamily: 'GNV4',
-        virtualMachinePackageFamily: 'A',
+        virtualMachinePackageFamily: 'NVIDIA.A10',
         virtualMachineArch: Arch.Heterogeneous,
         virtualMachineType: VirtualMachineType.GPU,
         chargeType: ChargeType.PostPaidByHour
@@ -110,7 +110,7 @@ async function createRegionAndZone() {
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
         cloudProviderVirtualMachinePackageFamily: 'GN7',
-        virtualMachinePackageFamily: 'B',
+        virtualMachinePackageFamily: 'NVIDIA.T4',
         virtualMachineArch: Arch.Heterogeneous,
         virtualMachineType: VirtualMachineType.GPU,
         chargeType: ChargeType.PostPaidByHour
@@ -118,7 +118,7 @@ async function createRegionAndZone() {
       {
         cloudVirtualMachineZoneId: guangzhou6._id,
         cloudProviderVirtualMachinePackageFamily: 'GN10Xp',
-        virtualMachinePackageFamily: 'C',
+        virtualMachinePackageFamily: 'NVIDIA.V100',
         virtualMachineArch: Arch.Heterogeneous,
         virtualMachineType: VirtualMachineType.GPU,
         chargeType: ChargeType.PostPaidByHour
