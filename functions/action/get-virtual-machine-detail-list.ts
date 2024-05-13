@@ -48,14 +48,16 @@ export default async function (ctx: FunctionContext) {
                 .countDocuments({
                     cloudProvider: vendorType,
                     sealosUserId: ok.sealosUserId,
-                    namespace: ok.namespace
+                    sealosRegionUid: ok.sealosRegionUid,
+                    sealosNamespace: ok.namespace
                 })
 
             const tencentMachineList = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine')
                 .find({
                     cloudProvider: vendorType,
                     sealosUserId: ok.sealosUserId,
-                    namespace: ok.namespace
+                    sealosRegionUid: ok.sealosRegionUid,
+                    sealosNamespace: ok.namespace
                 }).skip(
                     (body.page - 1) * body.pageSize
                 ).limit(body.pageSize)

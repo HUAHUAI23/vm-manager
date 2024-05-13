@@ -1,17 +1,23 @@
 import { validateDTO, verifyBearerToken } from '../utils'
 import { db } from '../db'
 const Decimal = require('decimal.js')
-import { ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
+import { Arch, ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType, getPriceForBandwidth } from '../entity'
 
 interface IRequestBody {
-  virtualMachinePackageName: string
   virtualMachinePackageFamily: string
+  virtualMachinePackageName: string
+
+  virtualMachineType: VirtualMachineType
+  virtualMachineArch: Arch
+  chareType: ChargeType
+
   imageId: string
   systemDisk: number
   dataDisks: number[]
   internetMaxBandwidthOut: number
   loginName?: string
   loginPassword: string
+  zone: string
   metaData?: {
     [key: string]: any
   }
@@ -32,7 +38,11 @@ const iRequestBodySchema = {
   internetMaxBandwidthOut: value => typeof value === 'number',
   loginName: value => typeof value === 'string' || value === undefined,
   loginPassword: value => typeof value === 'string',
-  metaData: value => typeof value === 'object' && value !== null || value === undefined
+  zone: value => typeof value === 'string',
+  metaData: value => typeof value === 'object' && value !== null || value === undefined,
+  virtualMachineType: () => true,
+  virtualMachineArch: () => true,
+  chareType: () => true
 }
 
 export default async function (ctx: FunctionContext) {
@@ -55,18 +65,22 @@ export default async function (ctx: FunctionContext) {
     return { data: null, error: 'Region not found' }
   }
 
-  const zone = 'ap-guangzhou-6'
   const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-    .findOne({ regionId: region._id, cloudProviderZone: zone })
+    .findOne({ regionId: region._id, name: body.zone })
 
   if (!cloudVirtualMachineZone) {
     return { data: null, error: 'CloudVirtualMachineZone not found' }
   }
 
+  const chargeType = ChargeType.PostPaidByHour
   const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
       cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
-      virtualMachinePackageFamily: body.virtualMachinePackageFamily
+      virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+      virtualMachineType: body.virtualMachineType,
+      virtualMachineArch: body.virtualMachineArch,
+      chargeType: chargeType
+
     })
 
   if (!virtualMachinePackageFamily) {
@@ -77,7 +91,7 @@ export default async function (ctx: FunctionContext) {
     .findOne({
       virtualMachinePackageName: body.virtualMachinePackageName,
       virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-      chargeType: ChargeType.PostPaidByHour
+      chargeType: chargeType
     })
 
   if (!virtualMachinePackage) {
@@ -101,16 +115,11 @@ export default async function (ctx: FunctionContext) {
   const diskPrice = diskSize.mul(new Decimal(virtualMachinePackage.diskPerG))
   let networkPrice = new Decimal(0)
 
+  const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, body.internetMaxBandwidthOut)
   // 根据带宽计算网络价格
-  if (body.internetMaxBandwidthOut) {
-    const internetMaxBandwidthOut = new Decimal(body.internetMaxBandwidthOut)
-    const networkSpeedBoundary = new Decimal(virtualMachinePackage.networkSpeedBoundary)
-    if (internetMaxBandwidthOut.lessThan(networkSpeedBoundary)) {
-      networkPrice = internetMaxBandwidthOut.mul(new Decimal(virtualMachinePackage.networkSpeedUnderSpeedBoundaryPerHour))
-    } else {
-      networkPrice = internetMaxBandwidthOut.mul(new Decimal(virtualMachinePackage.networkSpeedAboveSpeedBoundaryPerHour))
-    }
-  }
+  networkPrice =
+    new Decimal(networkPricePerMbps)
+      .mul(new Decimal(body.internetMaxBandwidthOut))
 
   // 将 Decimal 对象转换为数字类型
   price.diskPrice = diskPrice.toNumber()

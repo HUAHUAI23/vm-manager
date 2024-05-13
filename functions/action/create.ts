@@ -1,5 +1,5 @@
 import { VmVendors, getVmVendor } from '../type'
-import { ChargeType, CloudVirtualMachineZone, Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
+import { Arch, ChargeType, CloudVirtualMachineZone, Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType } from '../entity'
 import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
 import { TencentVm } from './tencent/tencent-vm'
@@ -9,12 +9,18 @@ import { getCloudVirtualMachineOneHourFee } from '../billing-task'
 interface IRequestBody {
     virtualMachinePackageFamily: string
     virtualMachinePackageName: string
+
+    virtualMachineType: VirtualMachineType
+    virtualMachineArch: Arch
+    chareType: ChargeType
+
     imageId: string
     systemDisk: number
     dataDisks: number[]
     internetMaxBandwidthOut: number
     loginName?: string
     loginPassword: string
+    zone: string
     metaData?: {
         [key: string]: any
     }
@@ -29,7 +35,11 @@ const iRequestBodySchema = {
     internetMaxBandwidthOut: value => typeof value === 'number',
     loginName: value => typeof value === 'string' || value === undefined,
     loginPassword: value => typeof value === 'string',
-    metaData: value => typeof value === 'object' && value !== null || value === undefined
+    zone: value => typeof value === 'string',
+    metaData: value => typeof value === 'object' && value !== null || value === undefined,
+    virtualMachineType: () => true,
+    virtualMachineArch: () => true,
+    chareType: () => true
 }
 
 
@@ -54,19 +64,23 @@ export default async function (ctx: FunctionContext) {
         return { data: null, error: 'Region not found' }
     }
 
-    const zone = 'ap-guangzhou-6'
 
     const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
-        .findOne({ regionId: region._id, cloudProviderZone: zone })
+        .findOne({ regionId: region._id, name: body.zone })
 
     if (!cloudVirtualMachineZone) {
         return { data: null, error: 'CloudVirtualMachineZone not found' }
     }
 
+    const chargeType = ChargeType.PostPaidByHour
     const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
         .findOne({
             cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
-            virtualMachinePackageFamily: body.virtualMachinePackageFamily
+            virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+            virtualMachineType: body.virtualMachineType,
+            virtualMachineArch: body.virtualMachineArch,
+            chargeType: chargeType
+
         })
 
     if (!virtualMachinePackageFamily) {
@@ -77,7 +91,7 @@ export default async function (ctx: FunctionContext) {
         .findOne({
             virtualMachinePackageName: body.virtualMachinePackageName,
             virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-            chargeType: ChargeType.PostPaidByHour
+            chargeType: chargeType
         })
 
     if (!virtualMachinePackage) {
@@ -114,7 +128,10 @@ export default async function (ctx: FunctionContext) {
 
 
             const instanceConfigInfo = await
-                TencentVmOperation.describeZoneInstanceConfigInfo(virtualMachinePackage.cloudProviderVirtualMachinePackageName)
+                TencentVmOperation.describeZoneInstanceConfigInfo(cloudVirtualMachineZone.cloudProviderZone,
+                    virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
+                    virtualMachinePackage.cloudProviderVirtualMachinePackageName,
+                    chargeType)
 
             if (instanceConfigInfo.Status !== 'SELL') {
                 return { data: null, error: 'sold out' }
@@ -124,38 +141,50 @@ export default async function (ctx: FunctionContext) {
             const tencentCloudVirtualMachine: TencentCloudVirtualMachine = {
                 phase: Phase.Creating,
                 state: State.Running,
-                namespace: ok.namespace,
+                sealosNamespace: ok.namespace,
                 sealosUserId: ok.sealosUserId,
                 sealosUserUid: ok.sealosUserUid,
-                sealosRegionDomain: region.sealosRegionDomain,
                 sealosRegionUid: region.sealosRegionUid,
+                sealosRegionDomain: region.sealosRegionDomain,
+
+                zoneId: cloudVirtualMachineZone._id,
+                zoneName: cloudVirtualMachineZone.name,
                 region: region.name,
+
                 cpu: instanceConfigInfo.Cpu,
                 memory: instanceConfigInfo.Memory,
                 gpu: instanceConfigInfo.Gpu,
                 disk: diskSize,
+
                 publicNetworkAccess: body.internetMaxBandwidthOut > 0,
                 internetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
-                imageId: body.imageId,
+
                 instanceName: instanceName,
+                imageId: body.imageId,
+
                 loginPassword: body.loginPassword,
+
                 cloudProvider: VmVendors.Tencent,
                 cloudProviderZone: cloudVirtualMachineZone.cloudProviderZone,
-                virtualMachinePackageFamily: body.virtualMachinePackageFamily,
+
+                virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
                 virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
-                chargeType: ChargeType.PostPaidByHour,
+
+                chargeType: virtualMachinePackage.chargeType,
+
                 createTime: new Date(),
                 updateTime: new Date(),
-                latestBillingTime: TASK_LOCK_INIT_TIME,
-                billingLockedAt: TASK_LOCK_INIT_TIME,
                 lockedAt: TASK_LOCK_INIT_TIME,
+                billingLockedAt: TASK_LOCK_INIT_TIME,
+                latestBillingTime: TASK_LOCK_INIT_TIME,
+
                 metaData: {
                     "SecurityGroupIds": [
                         "sg-jvxnr55b"
                     ],
                     InstanceChargeType: 'POSTPAID_BY_HOUR',
                     Placement: {
-                        Zone: zone,
+                        Zone: cloudVirtualMachineZone.cloudProviderZone,
                         ProjectId: 1311479,
                     },
                     InstanceType: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
@@ -191,7 +220,6 @@ export default async function (ctx: FunctionContext) {
                     ],
                     UserData: 'IyEvYmluL2Jhc2gKc2V0IC1ldXhvIHBpcGVmYWlsCmlmIFtbICRFVUlEIC1uZSAwIF1dOyB0aGVuCiAgIGVjaG8gIlRoaXMgc2NyaXB0IG11c3QgYmUgcnVuIGFzIHJvb3QiIAogICBleGl0IDEKZmkKUkVTT0xWRV9ESVI9L2V0Yy9zeXN0ZW1kL3Jlc29sdmVkLmNvbmYuZApSRVNPTFZFX0ZJTEU9c2VhbG9zLWNvcmVkbnMuY29uZgplY2hvICJTZXR0aW5nIHVwIEROUyBzZXJ2ZXIuLi4iCm1rZGlyIC1wICR7UkVTT0xWRV9ESVJ9CmVjaG8gIltSZXNvbHZlXSIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkROUz0xMC45Ni4wLjEwIiA+PiAke1JFU09MVkVfRElSfS8ke1JFU09MVkVfRklMRX0KZWNobyAiRG9tYWlucz1+LiIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkZhbGxiYWNrRE5TPTE4My42MC44My4xOSIgPj4gJHtSRVNPTFZFX0ZJTEV9CnN5c3RlbWN0bCByZXN0YXJ0IHN5c3RlbWQtcmVzb2x2ZWQKZWNobyAiRE5TIHNlcnZlciBzZXR1cCBjb21wbGV0ZS4i'
                 }
-
             }
 
             if (body?.dataDisks[0]) {

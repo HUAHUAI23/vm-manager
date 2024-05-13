@@ -1,0 +1,6 @@
+name: action/get-region-details
+desc: ""
+methods:
+  - GET
+  - POST
+tags: []
