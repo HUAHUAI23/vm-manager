@@ -3,7 +3,7 @@ import { db } from "../db"
 import { CloudVirtualMachine, Phase, State } from "../entity"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 import { TencentVmOperation } from "../sdk/tencent/tencent-sdk"
-import { TASK_LOCK_INIT_TIME, sleepTime } from "../constants"
+import CONSTANTS from "../constants"
 import { sleep } from "../utils"
 
 export async function handleRestartEvents(vm: CloudVirtualMachine) {
@@ -25,13 +25,13 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
                 console.log(333)
                 await TencentVmOperation.restart(vm.instanceId)
 
-                await sleep(sleepTime)
+                await sleep(CONSTANTS.SLEEP_TIME)
 
                 await collection.updateOne(
                     { _id: vm._id },
                     {
                         $set: {
-                            lockedAt: TASK_LOCK_INIT_TIME
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     }
                 )
@@ -44,7 +44,7 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
                     { _id: vm._id },
                     {
                         $set: {
-                            lockedAt: TASK_LOCK_INIT_TIME
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     }
                 )
@@ -59,7 +59,7 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
                         state: State.Running,
                         phase: Phase.Started,
                         updateTime: new Date(),
-                        lockedAt: TASK_LOCK_INIT_TIME
+                        lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                     }
                 })
 

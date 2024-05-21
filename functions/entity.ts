@@ -103,7 +103,6 @@ export class CloudVirtualMachine {
 }
 
 export interface TencentMeta {
-  SecurityGroupIds: Array<string>
   InstanceChargeType: string
   Placement: {
     Zone: string
@@ -122,10 +121,24 @@ export interface TencentMeta {
     InternetMaxBandwidthOut: number
     PublicIpAssigned: boolean
   }
+  InstanceCount: number
   InstanceName: string
   LoginSettings?: {
     Password: string
   }
+  SecurityGroupIds: Array<string>
+  EnhancedService: {
+    SecurityService: {
+      Enabled: boolean
+    }
+    MonitorService: {
+      Enabled: boolean
+    }
+    AutomationService: {
+      Enabled: boolean
+    }
+  }
+  ClientToken: string
   TagSpecification: Array<{
     ResourceType: string
     Tags: Array<{
@@ -134,6 +147,10 @@ export interface TencentMeta {
     }>
   }>
   UserData: string
+  InstanceChargePrepaid?: {
+    Period: number
+    RenewFlag: string
+  }
 }
 
 
@@ -252,11 +269,10 @@ export class CloudVirtualMachineSubscription {
   sealosRegionDomain: string
   sealosNamespace: string
   region: string
-
-  instanceName: string
-
+  regionId: ObjectId
   zoneId: ObjectId
   zoneName: string
+  instanceName: string
 
   virtualMachinePackageFamilyId: ObjectId
   virtualMachinePackageName: string
@@ -323,3 +339,17 @@ export function getPriceForBandwidth(
   }
   return null // 没有找到匹配的带宽区间，返回 null
 }
+
+// 左开右闭
+// export function getPriceForBandwidth(
+//   vmPackage: VirtualMachinePackage,
+//   bandwidth: number
+// ): number | null {
+//   for (const tier of vmPackage.bandwidthPricingTiers) {
+//     // 修改条件为左开右闭：(minBandwidth, maxBandwidth]
+//     if (bandwidth > tier.minBandwidth && (tier.maxBandwidth === null || bandwidth <= tier.maxBandwidth)) {
+//       return tier.pricePerMbps;
+//     }
+//   }
+//   return null; // 没有找到匹配的带宽区间，返回 null
+// }

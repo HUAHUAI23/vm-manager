@@ -2,7 +2,7 @@ import { VmVendors, getVmVendor } from "../type"
 import { CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
-import { TASK_LOCK_INIT_TIME, sleepTime, timeOut } from "../constants"
+import CONSTANTS from "../constants"
 import { sleep } from "../utils"
 
 export async function handlerCreateEvents(vm: CloudVirtualMachine) {
@@ -17,7 +17,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
             // if waiting time is more than 3 minutes, operation failed 
             const waitingTime = Date.now() - vm.updateTime.getTime()
 
-            if (waitingTime > timeOut) {
+            if (waitingTime > CONSTANTS.TIMEOUT) {
 
                 await collection.updateOne(
                     { _id: vm._id },
@@ -26,7 +26,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                             state: State.Deleted,
                             phase: Phase.Deleting,
                             updateTime: new Date(),
-                            lockedAt: TASK_LOCK_INIT_TIME
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     })
 
@@ -45,12 +45,12 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                 console.log(333)
                 await TencentVmOperation.create(vm.metaData)
                 // sleep
-                await sleep(sleepTime)
+                await sleep(CONSTANTS.SLEEP_TIME)
                 await collection.updateOne(
                     { _id: vm._id },
                     {
                         $set: {
-                            lockedAt: TASK_LOCK_INIT_TIME
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     }
                 )
@@ -65,7 +65,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                         $set: {
                             instanceId: instance.InstanceId,
                             updateTime: new Date(),
-                            lockedAt: TASK_LOCK_INIT_TIME
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     })
 
@@ -79,7 +79,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                     { _id: vm._id },
                     {
                         $set: {
-                            lockedAt: TASK_LOCK_INIT_TIME
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     }
                 )
@@ -98,7 +98,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                     "metaData.DataDisks": instance.DataDisks,
                     phase: Phase.Started,
                     updateTime: new Date(),
-                    lockedAt: TASK_LOCK_INIT_TIME
+                    lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                 }
             })
 

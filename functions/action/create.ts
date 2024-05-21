@@ -4,7 +4,7 @@ import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
 import { TencentVm } from './tencent/tencent-vm'
 import { db } from '../db'
-import { TASK_LOCK_INIT_TIME } from '../constants'
+import CONSTANTS from '../constants'
 import { getCloudVirtualMachineOneHourFee } from '../billing-task'
 interface IRequestBody {
     virtualMachinePackageFamily: string
@@ -72,7 +72,8 @@ export default async function (ctx: FunctionContext) {
         return { data: null, error: 'CloudVirtualMachineZone not found' }
     }
 
-    const chargeType = ChargeType.PostPaidByHour
+    // const chargeType = ChargeType.PostPaidByHour
+    const chargeType = body.chareType
     const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
         .findOne({
             cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
@@ -141,7 +142,7 @@ export default async function (ctx: FunctionContext) {
             const tencentCloudVirtualMachine: TencentCloudVirtualMachine = {
                 phase: Phase.Creating,
                 state: State.Running,
-                sealosNamespace: ok.namespace,
+                sealosNamespace: ok.sealosNamespace,
                 sealosUserId: ok.sealosUserId,
                 sealosUserUid: ok.sealosUserUid,
                 sealosRegionUid: region.sealosRegionUid,
@@ -174,15 +175,12 @@ export default async function (ctx: FunctionContext) {
 
                 createTime: new Date(),
                 updateTime: new Date(),
-                lockedAt: TASK_LOCK_INIT_TIME,
-                billingLockedAt: TASK_LOCK_INIT_TIME,
-                latestBillingTime: TASK_LOCK_INIT_TIME,
+                lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,
+                billingLockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,
+                latestBillingTime: CONSTANTS.TASK_LOCK_INIT_TIME,
 
                 metaData: {
-                    "SecurityGroupIds": [
-                        "sg-jvxnr55b"
-                    ],
-                    InstanceChargeType: 'POSTPAID_BY_HOUR',
+                    InstanceChargeType: chargeType === ChargeType.PostPaidByHour ? 'POSTPAID_BY_HOUR' : "PREPAID",
                     Placement: {
                         Zone: cloudVirtualMachineZone.cloudProviderZone,
                         ProjectId: 1311479,
@@ -198,14 +196,30 @@ export default async function (ctx: FunctionContext) {
                         SubnetId: 'subnet-643z86ds'
                     },
                     InternetAccessible: {
-                        InternetChargeType: "BANDWIDTH_POSTPAID_BY_HOUR",
+                        InternetChargeType: chargeType === ChargeType.PostPaidByHour ? "BANDWIDTH_POSTPAID_BY_HOUR" : "BANDWIDTH_PREPAID",
                         InternetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
                         PublicIpAssigned: body.internetMaxBandwidthOut > 0
                     },
+                    InstanceCount: 1,
                     InstanceName: instanceName,
                     LoginSettings: {
                         Password: body.loginPassword
                     },
+                    SecurityGroupIds: [
+                        "sg-jvxnr55b"
+                    ],
+                    EnhancedService: {
+                        SecurityService: {
+                            Enabled: true
+                        },
+                        MonitorService: {
+                            Enabled: true
+                        },
+                        AutomationService: {
+                            Enabled: true
+                        }
+                    },
+                    ClientToken: "system-f3827db9-c58a-49cc-bf10-33fc1923a34a",
                     TagSpecification: [
                         {
                             ResourceType: "instance",
@@ -229,6 +243,14 @@ export default async function (ctx: FunctionContext) {
                     DiskSize: size,
                     DeleteWithInstance: true,
                 }))
+            }
+
+            if (chargeType === ChargeType.PrePaid) {
+
+                tencentCloudVirtualMachine.metaData.InstanceChargePrepaid = {
+                    Period: 1,
+                    RenewFlag: "NOTIFY_AND_MANUAL_RENEW"
+                }
             }
 
             await TencentVm.create(tencentCloudVirtualMachine)

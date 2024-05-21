@@ -1,6 +1,4 @@
 name: billing-task
 desc: ""
-methods:
-  - GET
-  - POST
+methods: []
 tags: []

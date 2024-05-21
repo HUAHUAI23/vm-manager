@@ -42,7 +42,7 @@ export default async function (ctx: FunctionContext) {
                     .findOne({
                         instanceName: body.instanceName,
                         sealosUserId: ok.sealosUserId,
-                        sealosNamespace: ok.namespace
+                        sealosRegionUid: ok.sealosRegionUid
                     })
 
             if (!tencentVm) {

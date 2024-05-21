@@ -49,7 +49,6 @@ export default async function (ctx: FunctionContext) {
                     cloudProvider: vendorType,
                     sealosUserId: ok.sealosUserId,
                     sealosRegionUid: ok.sealosRegionUid,
-                    sealosNamespace: ok.namespace
                 })
 
             const tencentMachineList = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine')
@@ -57,7 +56,6 @@ export default async function (ctx: FunctionContext) {
                     cloudProvider: vendorType,
                     sealosUserId: ok.sealosUserId,
                     sealosRegionUid: ok.sealosRegionUid,
-                    sealosNamespace: ok.namespace
                 }).skip(
                     (body.page - 1) * body.pageSize
                 ).limit(body.pageSize)

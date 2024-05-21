@@ -9,8 +9,8 @@ import { handleRestartEvents } from './handler/restart-events'
 import { handlerStopEvents } from './handler/stop-events'
 import { handlerDeleteEvents } from './handler/delete-events'
 import { handlerChangeEvents } from './handler/change-events'
-import { stateChangeLockTime } from './constants'
 import { Cron } from "croner"
+import CONSTANTS from './constants'
 
 // todo 锁随机性处理
 // 创建事件发射器
@@ -36,7 +36,7 @@ async function reconcileState() {
             const create = await collection.findOneAndUpdate({
                 _id: createVm._id,
                 lockedAt: {
-                    $lt: new Date(Date.now() - stateChangeLockTime),
+                    $lt: new Date(Date.now() - CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
                 },
                 state: State.Running,
                 phase: {
@@ -59,7 +59,7 @@ async function reconcileState() {
                 {
                     _id: startVm._id,
                     lockedAt: {
-                        $lt: new Date(Date.now() - stateChangeLockTime),
+                        $lt: new Date(Date.now() -  CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
                     },
                     state: State.Running,
                     phase: Phase.Starting
@@ -81,7 +81,7 @@ async function reconcileState() {
                 {
                     _id: restartVm._id,
                     lockedAt: {
-                        $lt: new Date(Date.now() - stateChangeLockTime),
+                        $lt: new Date(Date.now() -  CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
                     },
                     state: State.Restarting,
                     phase: {
@@ -105,7 +105,7 @@ async function reconcileState() {
                 {
                     _id: stopVm._id,
                     lockedAt: {
-                        $lt: new Date(Date.now() - stateChangeLockTime),
+                        $lt: new Date(Date.now() -  CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
                     },
                     state: State.Stopped,
                     phase: Phase.Stopping
@@ -127,7 +127,7 @@ async function reconcileState() {
                 {
                     _id: destroyVm._id,
                     lockedAt: {
-                        $lt: new Date(Date.now() - stateChangeLockTime),
+                        $lt: new Date(Date.now() -  CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
                     },
                     state: State.Deleted,
                     phase: { $in: [Phase.Deleting, Phase.Deleted] }
@@ -149,7 +149,7 @@ async function reconcileState() {
                 {
                     _id: changeVm._id,
                     lockedAt: {
-                        $lt: new Date(Date.now() - stateChangeLockTime),
+                        $lt: new Date(Date.now() -  CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
                     },
                     state: State.Changing,
                     phase: Phase.Stopped
@@ -206,7 +206,7 @@ eventEmitter.on(EVENT_CHANGE, (vm: CloudVirtualMachine) => {
 async function getRandomReconcileVms(state: State, phase: Phase[]): Promise<CloudVirtualMachine | false> {
     const vms = await db.collection<CloudVirtualMachine>('CloudVirtualMachine').find({
         lockedAt: {
-            $lt: new Date(Date.now() - stateChangeLockTime),
+            $lt: new Date(Date.now() -  CONSTANTS.STATE_CHANGE_LOCK_TIMEOUT),
         },
         state: state,
         phase: { $in: phase }

@@ -1,10 +1,9 @@
 import { db, client } from './db'
 import { CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, Phase, State, VirtualMachinePackage, VirtualMachinePackageFamily, getPriceForBandwidth } from './entity'
-import { TASK_LOCK_INIT_TIME } from './constants'
 import { Cron } from "croner"
 import { BillingJob, getSealosUserAccount } from './utils'
 import { Decimal } from 'decimal.js'
-import { billingLockTimeOut, billingInterval } from './constants'
+import CONSTANTS from './constants'
 
 // todo 添加欠费删除与欠费关机逻辑 欠费标识
 
@@ -17,10 +16,10 @@ async function handleCloudVirtualMachineBillingCreating() {
     findOneAndUpdate({
       // 例如当前时间是 12:34:56.789  则 只找出最后一次计费时间在 11:34:56.789 之前的 CloudVirtualMachine
       latestBillingTime: {
-        $lt: new Date(Date.now() - billingInterval),
+        $lt: new Date(Date.now() - CONSTANTS.BILLING_INTERVAL),
       },
       billingLockedAt: {
-        $lt: new Date(Date.now() - billingLockTimeOut),
+        $lt: new Date(Date.now() - CONSTANTS.BILLING_LOCK_TIMEOUT),
       },
       // 已关机和已启动的虚拟机
       phase: { $in: [Phase.Started, Phase.Stopped] }
@@ -105,7 +104,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
       disk: 0
     },
     startAt: latestBillingTime,
-    endAt: new Date(latestBillingTime.getTime() + billingInterval),
+    endAt: new Date(latestBillingTime.getTime() + CONSTANTS.BILLING_INTERVAL),
     amount: 0,
     state: CloudVirtualMachineBillingState.Pending,
     chargeType: cloudVirtualMachine.chargeType
@@ -175,13 +174,13 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     await db.collection<CloudVirtualMachine>('CloudVirtualMachine').updateOne(
       { _id: cloudVirtualMachine._id },
       {
-        $set: { latestBillingTime, billingLockedAt: TASK_LOCK_INIT_TIME }
+        $set: { latestBillingTime, billingLockedAt: CONSTANTS.TASK_LOCK_INIT_TIME }
       },
       { session }
     )
 
     console.info(
-      `Billing creation complete for cloudVirtualMachine instanceName: ${cloudVirtualMachine.instanceName} from ${latestBillingTime.toISOString()} to ${new Date(latestBillingTime.getTime() + billingInterval).toISOString()} for billing ${res.insertedId}`,
+      `Billing creation complete for cloudVirtualMachine instanceName: ${cloudVirtualMachine.instanceName} from ${latestBillingTime.toISOString()} to ${new Date(latestBillingTime.getTime() + CONSTANTS.BILLING_INTERVAL).toISOString()} for billing ${res.insertedId}`,
     )
 
     await session.commitTransaction()
