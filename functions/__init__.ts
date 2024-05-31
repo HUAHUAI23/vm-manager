@@ -1,8 +1,8 @@
-import { CloudVirtualMachineZone, VirtualMachinePackage, Region, ChargeType, VirtualMachinePackageFamily, VirtualMachineType, Arch } from './entity'
-import { reconcile } from './reconcile'
+import { CloudVirtualMachineZone, VirtualMachinePackage, Region, ChargeType, VirtualMachinePackageFamily, VirtualMachineType, Arch, BandwidthPricingTier } from './entity'
 import util from 'util'
 import { VmVendors } from './type'
 import { client, db } from './db'
+import { reconcile } from './reconcile'
 import { billingJob } from './billing-task'
 
 
@@ -63,7 +63,8 @@ async function createRegionAndZone() {
       { session }
     )
 
-    const BandwidthPricingTierList = [
+    // 按量
+    const BandwidthPricingTierList: BandwidthPricingTier[] = [
       {
         minBandwidth: 0,
         maxBandwidth: 5,
@@ -77,7 +78,28 @@ async function createRegionAndZone() {
       }
     ]
 
+    const BandwidthPricingTierListPre: BandwidthPricingTier[] = [
+      {
+        minBandwidth: 0,
+        maxBandwidth: 2,
+        pricePerMbps: 10,
+      },
+      {
+        minBandwidth: 2,
+        maxBandwidth: 5,
+        pricePerMbps: 12.5,
+      },
+      {
+        minBandwidth: 5,
+        maxBandwidth: null,
+        pricePerMbps: 45,
+      }
+
+    ]
+
+
     const virtualMachinePackageFamily: VirtualMachinePackageFamily[] = [
+      // 按量计费
       // guangzhou6
       // x86 计算
       // 特惠
@@ -128,6 +150,29 @@ async function createRegionAndZone() {
       // 异构计算
       // GPU
 
+
+
+      // 包年包月
+      // guangzhou6
+      // x86 计算
+      // 特惠
+      {
+        cloudVirtualMachineZoneId: guangzhou6._id,
+        cloudProviderVirtualMachinePackageFamily: 'TS5',
+        virtualMachinePackageFamily: 'highPerformance',
+        virtualMachineArch: Arch.X86_64,
+        virtualMachineType: VirtualMachineType.CostEffective,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        cloudVirtualMachineZoneId: guangzhou6._id,
+        cloudProviderVirtualMachinePackageFamily: 'TM5',
+        virtualMachinePackageFamily: 'highMemory',
+        virtualMachineArch: Arch.X86_64,
+        virtualMachineType: VirtualMachineType.CostEffective,
+        chargeType: ChargeType.PrePaid
+      },
+
     ]
 
 
@@ -135,6 +180,7 @@ async function createRegionAndZone() {
       virtualMachinePackageFamily, { session }
     )
 
+    // 按量
     const TS5 = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne(
       { cloudVirtualMachineZoneId: guangzhou6._id, cloudProviderVirtualMachinePackageFamily: 'TS5' },
       { session }
@@ -156,7 +202,19 @@ async function createRegionAndZone() {
       { session }
     )
 
+    // 包月
+    // 按量
+    const TS5_Pre = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne(
+      { cloudVirtualMachineZoneId: guangzhou6._id, cloudProviderVirtualMachinePackageFamily: 'TS5', chargeType: ChargeType.PrePaid },
+      { session }
+    )
+    const TM5_Pre = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne(
+      { cloudVirtualMachineZoneId: guangzhou6._id, cloudProviderVirtualMachinePackageFamily: 'TM5', chargeType: ChargeType.PrePaid },
+      { session }
+    )
+
     const virtualMachinePackageList: VirtualMachinePackage[] = [
+      // 按量
       // TS5
       {
         virtualMachinePackageFamilyId: TS5._id,
@@ -305,6 +363,26 @@ async function createRegionAndZone() {
         diskPerG: 0.0008,
         bandwidthPricingTiers: BandwidthPricingTierList,
         chargeType: ChargeType.PostPaidByHour
+      },
+
+      // 包月
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-1',
+        cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM4',
+        instancePrice: 50,
+        diskPerG: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TM5_Pre._id,
+        virtualMachinePackageName: 'sealos-1',
+        cloudProviderVirtualMachinePackageName: 'TM5.2XLARGE64',
+        instancePrice: 300,
+        diskPerG: 0.2,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
       },
     ]
 

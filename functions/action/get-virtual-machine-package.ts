@@ -1,6 +1,6 @@
 import { db } from "../db"
 import { TencentVmOperation } from "../sdk/tencent/tencent-sdk"
-import { VmVendors, getVmVendor } from "../type"
+import { VmVendors, isValueInEnum, getVmVendor } from "../type"
 import { verifyBearerToken } from "../utils"
 import { Arch, BandwidthPricingTier, ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType } from "../entity"
 import { InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
@@ -11,9 +11,9 @@ interface IResponse {
 }
 interface IRequestBody {
     zone: string
-    virtualMachinePackageFamily: string
     virtualMachineArch: Arch
     virtualMachineType: VirtualMachineType
+    virtualMachinePackageFamily: string
     chargeType: ChargeType
 }
 
@@ -86,7 +86,14 @@ export default async function (ctx: FunctionContext) {
         return { data: null, error: 'CloudVirtualMachineZone not found' }
     }
 
-    const chargeType = ChargeType.PostPaidByHour
+    let chargeType: ChargeType
+    try {
+        chargeType = isValueInEnum(ChargeType, body.chargeType)
+    } catch (error) {
+        console.error(error.stack)
+        return { data: null, error: 'chargeType not found' }
+    }
+
     const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
         .findOne({
             cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
@@ -103,18 +110,26 @@ export default async function (ctx: FunctionContext) {
     switch (vendorType) {
         case VmVendors.Tencent:
             const vmTypeList = await
-                TencentVmOperation.describeZoneInstanceConfigInfos(cloudVirtualMachineZone.cloudProviderZone,
+                TencentVmOperation.describeZoneInstanceConfigInfos(
+                    cloudVirtualMachineZone.cloudProviderZone,
                     virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
-                    chargeType)
+                    chargeType
+                )
 
             const virtualMachinePackageList = await db.collection<VirtualMachinePackage>('VirtualMachinePackage').
-                find({
-                    virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-                    chargeType: chargeType
-                }).toArray()
+                find(
+                    {
+                        virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
+                        chargeType: chargeType
+                    }
+                ).toArray()
 
             const sealosVirtualMachineList: sealosVirtualMachinePackage[] =
-                tencentMapAndTransform(virtualMachinePackageList, virtualMachinePackageFamily.virtualMachinePackageFamily, vmTypeList)
+                tencentMapAndTransform(
+                    virtualMachinePackageList,
+                    virtualMachinePackageFamily.virtualMachinePackageFamily,
+                    vmTypeList
+                )
 
             sealosVirtualMachineList.sort((a, b) => {
                 // 首先按 CPU 排序

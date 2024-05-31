@@ -8,3 +8,4 @@ spec:
     decimal.js: 10.4.3
     tencentcloud-sdk-nodejs: 4.0.838
     pg: 8.11.5
+    uuid: latest

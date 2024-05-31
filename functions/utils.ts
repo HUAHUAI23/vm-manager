@@ -3,6 +3,7 @@ import { Cron } from "croner"
 import { pgPool } from './db'
 import { Decimal } from 'decimal.js'
 import { encrypt, deCrypt } from './crypto'
+import { PoolClient, QueryConfig } from 'pg'
 
 type SealosAccount = {
     activityBonus: bigint
@@ -33,36 +34,118 @@ export function verifyBearerToken(token: string) {
     }
 }
 
-export function validateDTO(dto, schema) {
+// export function validateDTO(dto, schema) {
+//     if (Object.keys(dto).length === 0) {
+//         throw new Error("DTO cannot be empty")
+//     }
+
+//     // Validate presence and values of required keys
+//     for (const key in schema) {
+//         if (!dto.hasOwnProperty(key)) {
+//             throw new Error(`Missing required key '${key}'`)
+//         }
+
+//         const isValid = schema[key](dto[key])
+//         if (!isValid) {
+//             throw new Error(`Invalid value for key '${key}'`)
+//         }
+//     }
+
+//     // Check for any keys not present in the schema
+//     for (const key in dto) {
+//         if (!schema.hasOwnProperty(key)) {
+//             throw new Error(`Key '${key}' is not allowed`)
+//         }
+//     }
+
+//     // If all checks pass, return true
+//     return true
+// }
+
+type ValidatorFn = (value: any) => boolean
+
+export interface Schema {
+    [key: string]: ValidatorFn | Schema | { optional: true, validate: ValidatorFn | Schema }
+}
+
+export function validateDTO(dto: any, schema: Schema) {
     if (Object.keys(dto).length === 0) {
         throw new Error("DTO cannot be empty")
     }
 
-    // Validate presence and values of required keys
-    for (const key in schema) {
-        if (!dto.hasOwnProperty(key)) {
-            throw new Error(`Missing required key '${key}'`)
+    const validate = (obj: any, sch: Schema, path = '') => {
+        for (const key in sch) {
+            const fullPath = path ? `${path}.${key}` : key
+            const value = obj[key]
+            const validatorOrSchema = sch[key]
+
+            if (typeof validatorOrSchema === 'function') {
+                if (!obj.hasOwnProperty(key)) {
+                    throw new Error(`Missing required key '${fullPath}'`)
+                }
+                const isValid = (validatorOrSchema as ValidatorFn)(value)
+                if (!isValid) {
+                    throw new Error(`Invalid value for key '${fullPath}'`)
+                }
+            } else if (typeof validatorOrSchema === 'object' && 'optional' in validatorOrSchema) {
+                if (obj.hasOwnProperty(key)) {
+                    if (typeof validatorOrSchema.validate === 'function') {
+                        const isValid = (validatorOrSchema.validate as ValidatorFn)(value)
+                        if (!isValid) {
+                            throw new Error(`Invalid value for key '${fullPath}'`)
+                        }
+                    } else {
+                        validate(value, validatorOrSchema.validate as Schema, fullPath)
+                    }
+                }
+            } else {
+                if (!obj.hasOwnProperty(key)) {
+                    throw new Error(`Missing required key '${fullPath}'`)
+                }
+                validate(value, validatorOrSchema as Schema, fullPath)
+            }
         }
 
-        const isValid = schema[key](dto[key])
-        if (!isValid) {
-            throw new Error(`Invalid value for key '${key}'`)
+        for (const key in obj) {
+            const fullPath = path ? `${path}.${key}` : key
+            if (!sch.hasOwnProperty(key)) {
+                const keyIsValid = Object.keys(sch).some(schemaKey => {
+                    const schemaEntry = sch[schemaKey]
+                    if (typeof schemaEntry === 'object' && 'optional' in schemaEntry && schemaEntry.optional) {
+                        if (typeof schemaEntry.validate === 'object') {
+                            return key in schemaEntry.validate
+                        }
+                    }
+                    return false
+                })
+                if (!keyIsValid) {
+                    throw new Error(`Key '${fullPath}' is not allowed`)
+                }
+            }
         }
     }
 
-    // Check for any keys not present in the schema
-    for (const key in dto) {
-        if (!schema.hasOwnProperty(key)) {
-            throw new Error(`Key '${key}' is not allowed`)
-        }
-    }
+    validate(dto, schema)
 
-    // If all checks pass, return true
     return true
 }
 
+
+
+
+
+
+export function validatePeriod(period: number): boolean {
+    const validPeriods: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 36]
+    if (validPeriods.includes(period)) {
+        return true
+    }
+    throw new Error(`Invalid period: '${period}' is not in the valid periods: [${validPeriods.join(', ')}]`)
+}
+
+
 export async function getSealosUserAccount(sealosUserUid: string) {
-    const query = {
+    const query: QueryConfig<string[]> = {
         text: 'SELECT * FROM "Account" WHERE "userUid" = $1',
         values: [sealosUserUid],  // 将userUid作为参数传递给查询
     }
@@ -77,6 +160,7 @@ export async function getSealosUserAccount(sealosUserUid: string) {
         if (res.rows.length > 1) {
             throw new Error('Multiple accounts found with the given userUid.')
         }
+
         const sealosAccount: SealosAccount = res.rows[0]
 
         const account = new Decimal(sealosAccount.balance.toString()).minus(sealosAccount.deduction_balance.toString())
@@ -92,18 +176,9 @@ export async function getSealosUserAccount(sealosUserUid: string) {
 
 }
 
-function logType(value: any): void {
-    console.log(`Type of value: ${typeof value}`)
-}
-function replacer(key, value) {
-    if (typeof value === 'bigint') {
-        return value.toString()
-    }
-    return value
-}
+export async function validationEncrypt(sealosUserUid: string): Promise<boolean> {
 
-export async function validationEncrypt(sealosUserUid: string) {
-    const query = {
+    const query: QueryConfig<string[]> = {
         text: 'SELECT * FROM "Account" WHERE "userUid" = $1',
         values: [sealosUserUid],  // 将userUid作为参数传递给查询
     }
@@ -128,23 +203,20 @@ export async function validationEncrypt(sealosUserUid: string) {
         return true
 
     } catch (error) {
-        console.error('Error executing query', error.stack)
+        console.error('validate encrypt failed', error.stack)
         throw error
     }
 }
 
-export async function deductSealosBalance(sealosUserUid: string, deductionAmount: bigint) {
+export async function deductSealosBalance(sealosUserUid: string, deductionAmount: bigint, client: PoolClient) {
 
-    const query = {
+    const query: QueryConfig<string[]> = {
         text: 'SELECT * FROM "Account" WHERE "userUid" = $1',
         values: [sealosUserUid],  // 将userUid作为参数传递给查询
     }
 
-    const client = await pgPool.connect()
 
     try {
-        await client.query('BEGIN')
-
         const res = await client.query(query)
 
         const account: SealosAccount = res.rows[0]
@@ -153,29 +225,17 @@ export async function deductSealosBalance(sealosUserUid: string, deductionAmount
 
         const newEncryptedDeductionBalance = encrypt(newDeductionBalance.toString())
 
-        logType(newDeductionBalance)
-        logType(newEncryptedDeductionBalance)
-
-        console.log('sql:')
-        console.log('newDeductionBalance:', newDeductionBalance.toString())
-        console.log('newEncryptedDeductionBalance:', newEncryptedDeductionBalance)
-        console.log(sealosUserUid)
-
-        const updateQuery = {
+        const updateQuery: QueryConfig<string[]> = {
             text: 'UPDATE "Account" SET "deduction_balance" = $1, "encryptDeductionBalance" = $2 WHERE "userUid" = $3',
             values: [newDeductionBalance.toString(), newEncryptedDeductionBalance, sealosUserUid],
         }
 
         await client.query(updateQuery)
-
-        await client.query('COMMIT')
     } catch (error) {
-        await client.query('ROLLBACK')
-        console.error('Error executing transaction', error.stack)
+        console.error('Error executing deduce sealos balance', error.stack)
         throw error
-    } finally {
-        client.release()
     }
+
 }
 
 export function sleep(ms: number): Promise<void> {

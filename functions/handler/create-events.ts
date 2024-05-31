@@ -1,5 +1,5 @@
 import { VmVendors, getVmVendor } from "../type"
-import { CloudVirtualMachine, Phase, State } from "../entity"
+import { ChargeType, CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 import CONSTANTS from "../constants"
@@ -9,15 +9,15 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
     const vendorType: VmVendors = getVmVendor(vendor)
-    // todo 设置锁，解决多实例下    await TencentVmOperation.create(vm.metaData) 并发请求问题
+    // todo 设置锁，解决多实例下    await TencentVmOperation.create(vm.metaData) 并发请求问题 已经解决了
 
     switch (vendorType) {
         case VmVendors.Tencent:
             console.log(222)
-            // if waiting time is more than 3 minutes, operation failed 
+            // if waiting time is more than 5 minutes, operation failed 
             const waitingTime = Date.now() - vm.updateTime.getTime()
 
-            if (waitingTime > CONSTANTS.TIMEOUT) {
+            if (waitingTime > CONSTANTS.TIMEOUT && vm.chargeType === ChargeType.PostPaidByHour) {
 
                 await collection.updateOne(
                     { _id: vm._id },
@@ -41,7 +41,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
 
             const instance = instanceList[0]
 
-            if (!instance) {
+            if (!instance && vm.chargeType === ChargeType.PostPaidByHour) {
                 console.log(333)
                 await TencentVmOperation.create(vm.metaData)
                 // sleep

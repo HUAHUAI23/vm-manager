@@ -1,18 +1,21 @@
-import { VmVendors, getVmVendor } from '../type'
-import { Arch, ChargeType, CloudVirtualMachineZone, Phase, Region, State, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType } from '../entity'
-import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
+import { VmVendors, isValueInEnum, getVmVendor } from '../type'
+import { Arch, ChargeType, CloudVirtualMachine, CloudVirtualMachineZone, Phase, Region, State, TencentMeta, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType } from '../entity'
+import { Schema, getSealosUserAccount, validateDTO, validatePeriod, verifyBearerToken } from '../utils'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
 import { TencentVm } from './tencent/tencent-vm'
 import { db } from '../db'
 import CONSTANTS from '../constants'
-import { getCloudVirtualMachineOneHourFee } from '../billing-task'
+import { getCloudVirtualMachineFee } from '../billing-task'
+import { v4 as uuidv4 } from 'uuid'
 interface IRequestBody {
+    virtualMachineArch: Arch
+    virtualMachineType: VirtualMachineType
+
     virtualMachinePackageFamily: string
     virtualMachinePackageName: string
 
-    virtualMachineType: VirtualMachineType
-    virtualMachineArch: Arch
-    chareType: ChargeType
+    chargeType: ChargeType
+    period?: number
 
     imageId: string
     systemDisk: number
@@ -26,22 +29,22 @@ interface IRequestBody {
     }
 }
 
-const iRequestBodySchema = {
-    virtualMachinePackageName: value => typeof value === 'string',
-    virtualMachinePackageFamily: value => typeof value === 'string',
-    imageId: value => typeof value === 'string',
-    systemDisk: value => typeof value === 'number' && Number.isInteger(value),
-    dataDisks: value => Array.isArray(value) && value.every(item => typeof item === 'number' && Number.isInteger(item)),
-    internetMaxBandwidthOut: value => typeof value === 'number',
-    loginName: value => typeof value === 'string' || value === undefined,
-    loginPassword: value => typeof value === 'string',
-    zone: value => typeof value === 'string',
-    metaData: value => typeof value === 'object' && value !== null || value === undefined,
-    virtualMachineType: () => true,
-    virtualMachineArch: () => true,
-    chareType: () => true
-}
-
+const iRequestBodySchema: Schema = {
+    virtualMachineArch: (value) => Object.values(Arch).includes(value),
+    virtualMachineType: (value) => Object.values(VirtualMachineType).includes(value),
+    virtualMachinePackageFamily: (value) => typeof value === 'string',
+    virtualMachinePackageName: (value) => typeof value === 'string',
+    chargeType: (value) => Object.values(ChargeType).includes(value),
+    period: { optional: true, validate: (value) => typeof value === 'number' },
+    imageId: (value) => typeof value === 'string',
+    systemDisk: (value) => typeof value === 'number',
+    dataDisks: (value) => Array.isArray(value) && value.every(v => typeof v === 'number'),
+    internetMaxBandwidthOut: (value) => typeof value === 'number',
+    loginName: { optional: true, validate: (value) => typeof value === 'string' },
+    loginPassword: (value) => typeof value === 'string',
+    zone: (value) => typeof value === 'string',
+    metaData: { optional: true, validate: (value) => typeof value === 'object' && value !== null && !Array.isArray(value) },
+};
 
 
 export default async function (ctx: FunctionContext) {
@@ -72,8 +75,13 @@ export default async function (ctx: FunctionContext) {
         return { data: null, error: 'CloudVirtualMachineZone not found' }
     }
 
-    // const chargeType = ChargeType.PostPaidByHour
-    const chargeType = body.chareType
+    let chargeType: ChargeType
+    try {
+        chargeType = isValueInEnum(ChargeType, body.chargeType)
+    } catch (error) {
+        return { data: null, error: 'chargeType not found' }
+    }
+
     const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
         .findOne({
             cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
@@ -81,7 +89,6 @@ export default async function (ctx: FunctionContext) {
             virtualMachineType: body.virtualMachineType,
             virtualMachineArch: body.virtualMachineArch,
             chargeType: chargeType
-
         })
 
     if (!virtualMachinePackageFamily) {
@@ -101,15 +108,38 @@ export default async function (ctx: FunctionContext) {
 
     const diskSize = body.systemDisk + (body.dataDisks ? body.dataDisks.reduce((acc, curr) => acc + curr, 0) : 0)
 
-    const cloudVirtualMachineOneHourFee = getCloudVirtualMachineOneHourFee(
-        virtualMachinePackage,
-        body.internetMaxBandwidthOut ? body.internetMaxBandwidthOut : 0,
-        diskSize
-    )
+    const period = body.period
+
+    if (chargeType === ChargeType.PrePaid) {
+        try {
+            validatePeriod(period)
+        } catch (error) {
+            return { data: null, error: error.message }
+        }
+    }
+
+    let cloudVirtualMachineFee: number
+    if (chargeType === ChargeType.PrePaid) {
+        cloudVirtualMachineFee = getCloudVirtualMachineFee(
+            virtualMachinePackage,
+            body.internetMaxBandwidthOut ? body.internetMaxBandwidthOut : 0,
+            diskSize,
+            period
+        ).amount
+    }
+
+    if (chargeType === ChargeType.PostPaidByHour) {
+        cloudVirtualMachineFee = getCloudVirtualMachineFee(
+            virtualMachinePackage,
+            body.internetMaxBandwidthOut ? body.internetMaxBandwidthOut : 0,
+            diskSize,
+        ).amount
+    }
 
     const sealosAccountRMB = await getSealosUserAccount(ok.sealosUserUid)
+    console.log('test sealosAccountRMB', sealosAccountRMB)
 
-    if (sealosAccountRMB < cloudVirtualMachineOneHourFee) {
+    if (sealosAccountRMB < cloudVirtualMachineFee) {
         return { data: null, error: 'Insufficient balance' }
     }
 
@@ -121,7 +151,7 @@ export default async function (ctx: FunctionContext) {
             const gen = nanoid.customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 7)
             const instanceName = gen()
 
-            const find = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine').findOne({ instanceName: instanceName })
+            const find = await db.collection<CloudVirtualMachine<TencentMeta>>('CloudVirtualMachine').findOne({ instanceName: instanceName })
 
             if (find) {
                 throw new Error(`The virtual machine with the instanceName ${instanceName} already exists.`)
@@ -139,17 +169,18 @@ export default async function (ctx: FunctionContext) {
             }
 
 
-            const tencentCloudVirtualMachine: TencentCloudVirtualMachine = {
+            const tencentCloudVirtualMachine: CloudVirtualMachine<TencentMeta> = {
                 phase: Phase.Creating,
                 state: State.Running,
+
                 sealosNamespace: ok.sealosNamespace,
                 sealosUserId: ok.sealosUserId,
                 sealosUserUid: ok.sealosUserUid,
                 sealosRegionUid: region.sealosRegionUid,
                 sealosRegionDomain: region.sealosRegionDomain,
 
-                zoneId: cloudVirtualMachineZone._id,
                 zoneName: cloudVirtualMachineZone.name,
+                zoneId: cloudVirtualMachineZone._id,
                 region: region.name,
 
                 cpu: instanceConfigInfo.Cpu,
@@ -219,7 +250,7 @@ export default async function (ctx: FunctionContext) {
                             Enabled: true
                         }
                     },
-                    ClientToken: "system-f3827db9-c58a-49cc-bf10-33fc1923a34a",
+                    ClientToken: uuidv4(),
                     TagSpecification: [
                         {
                             ResourceType: "instance",
@@ -232,6 +263,7 @@ export default async function (ctx: FunctionContext) {
                         }
 
                     ],
+                    DisableApiTermination: false,
                     UserData: 'IyEvYmluL2Jhc2gKc2V0IC1ldXhvIHBpcGVmYWlsCmlmIFtbICRFVUlEIC1uZSAwIF1dOyB0aGVuCiAgIGVjaG8gIlRoaXMgc2NyaXB0IG11c3QgYmUgcnVuIGFzIHJvb3QiIAogICBleGl0IDEKZmkKUkVTT0xWRV9ESVI9L2V0Yy9zeXN0ZW1kL3Jlc29sdmVkLmNvbmYuZApSRVNPTFZFX0ZJTEU9c2VhbG9zLWNvcmVkbnMuY29uZgplY2hvICJTZXR0aW5nIHVwIEROUyBzZXJ2ZXIuLi4iCm1rZGlyIC1wICR7UkVTT0xWRV9ESVJ9CmVjaG8gIltSZXNvbHZlXSIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkROUz0xMC45Ni4wLjEwIiA+PiAke1JFU09MVkVfRElSfS8ke1JFU09MVkVfRklMRX0KZWNobyAiRG9tYWlucz1+LiIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkZhbGxiYWNrRE5TPTE4My42MC44My4xOSIgPj4gJHtSRVNPTFZFX0ZJTEV9CnN5c3RlbWN0bCByZXN0YXJ0IHN5c3RlbWQtcmVzb2x2ZWQKZWNobyAiRE5TIHNlcnZlciBzZXR1cCBjb21wbGV0ZS4i'
                 }
             }
@@ -248,12 +280,20 @@ export default async function (ctx: FunctionContext) {
             if (chargeType === ChargeType.PrePaid) {
 
                 tencentCloudVirtualMachine.metaData.InstanceChargePrepaid = {
-                    Period: 1,
+                    Period: period,
                     RenewFlag: "NOTIFY_AND_MANUAL_RENEW"
                 }
+
+
+                // test
+                tencentCloudVirtualMachine.metaData.DryRun = true
             }
 
-            await TencentVm.create(tencentCloudVirtualMachine)
+            try {
+                await TencentVm.create(tencentCloudVirtualMachine, period)
+            } catch (error) {
+                return { data: null, error: `create vm ${tencentCloudVirtualMachine.instanceName} error` }
+            }
 
             return { data: tencentCloudVirtualMachine.instanceName, error: null }
 

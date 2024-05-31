@@ -6,8 +6,8 @@ import { Db, MongoClient } from 'mongodb'
 export const db: Db = cloud.mongo.db
 // @ts-ignore
 export const client: MongoClient = cloud.mongo.client
-// const connectionString = `postgresql://${process.env.PG_USER}:${process.env.PG_PASSWD}@cockroachdb-global.cockroach-operator-system.svc:26257/defaultdb`
-const connectionString = `postgresql://${process.env.PG_TEST_R}:${process.env.PG_TEST_P}@sgs.sealos.run:32147/defaultdb`
+const connectionString = `postgresql://${process.env.PG_USER}:${process.env.PG_PASSWD}@cockroachdb-global.cockroach-operator-system.svc:26257/defaultdb`
+// const connectionString = `postgresql://${process.env.PG_TEST_R}:${process.env.PG_TEST_P}@sgs.sealos.run:32147/defaultdb`
 
 
 types.setTypeParser(20, function (val: string) {

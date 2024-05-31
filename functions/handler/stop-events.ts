@@ -1,6 +1,6 @@
-import { CloudVirtualMachine, Phase } from "../entity"
+import { ChargeType, CloudVirtualMachine, Phase } from "../entity"
 import { db } from "../db"
-import { VmVendors, getVmVendor } from "../type"
+import { StoppedMode, VmVendors, getVmVendor } from "../type"
 import { Instance } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 import CONSTANTS from "../constants"
@@ -22,7 +22,13 @@ export async function handlerStopEvents(vm: CloudVirtualMachine) {
 
             if (instanceDetails.LatestOperation !== 'StopInstances' || instanceDetails.LatestOperationState === 'FAILED') {
                 console.log(333)
-                await TencentVmOperation.stop(vm.instanceId)
+                if (vm.chargeType === ChargeType.PostPaidByHour) {
+                    await TencentVmOperation.stop(vm.instanceId)
+                }
+
+                if (vm.chargeType === ChargeType.PrePaid) {
+                    await TencentVmOperation.stop(vm.instanceId, StoppedMode.KEEP_CHARGING)
+                }
 
                 await sleep(CONSTANTS.SLEEP_TIME)
 

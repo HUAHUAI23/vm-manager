@@ -55,6 +55,8 @@ export async function handlerStartEvents(vm: CloudVirtualMachine) {
                 { _id: vm._id },
                 {
                     $set: {
+                        privateIpAddresses: instanceDetails.PrivateIpAddresses,
+                        publicIpAddresses: instanceDetails.PublicIpAddresses,
                         phase: Phase.Started,
                         updateTime: new Date(),
                         lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,

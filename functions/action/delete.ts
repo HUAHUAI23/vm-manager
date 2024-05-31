@@ -1,6 +1,6 @@
 import { VmVendors, getVmVendor } from '../type'
 import { validateDTO, verifyBearerToken } from '../utils'
-import { IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine } from '../entity'
+import { ChargeType, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine } from '../entity'
 import { db } from '../db'
 import { TencentVm } from './tencent/tencent-vm'
 
@@ -48,6 +48,10 @@ export default async function (ctx: FunctionContext) {
 
             if (!tencentVm) {
                 return { data: null, error: 'Virtual Machine not found' }
+            }
+
+            if (tencentVm.chargeType === ChargeType.PrePaid) {
+                return { data: null, error: 'Prepaid virtual machine does not support this action.' }
             }
 
             // 检查状态是否为中间态

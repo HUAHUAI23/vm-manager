@@ -1,11 +1,11 @@
 import { db, client } from './db'
-import { CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, Phase, State, VirtualMachinePackage, VirtualMachinePackageFamily, getPriceForBandwidth } from './entity'
+import { ChargeType, CloudVirtualMachine, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, Phase, State, VirtualMachinePackage, VirtualMachinePackageFamily, getPriceForBandwidth } from './entity'
 import { Cron } from "croner"
 import { BillingJob, getSealosUserAccount } from './utils'
 import { Decimal } from 'decimal.js'
 import CONSTANTS from './constants'
 
-// todo 添加欠费删除与欠费关机逻辑 欠费标识
+// todo 添加欠费删除与欠费关机逻辑 欠费标识，欠费标识未添加，欠费关机逻辑已经添加
 
 async function tick() {
   await handleCloudVirtualMachineBillingCreating()
@@ -22,7 +22,9 @@ async function handleCloudVirtualMachineBillingCreating() {
         $lt: new Date(Date.now() - CONSTANTS.BILLING_LOCK_TIMEOUT),
       },
       // 已关机和已启动的虚拟机
-      phase: { $in: [Phase.Started, Phase.Stopped] }
+      phase: { $in: [Phase.Started, Phase.Stopped] },
+      // billing task 只处理 postPaidByHour 的虚拟机
+      chargeType: ChargeType.PostPaidByHour
     }, {
       $set: { billingLockedAt: new Date() }
     }
@@ -49,11 +51,14 @@ async function handleCloudVirtualMachineBillingCreating() {
       err.stack,
     )
   } finally {
-    handleCloudVirtualMachineBillingCreating
+    handleCloudVirtualMachineBillingCreating()
   }
 }
 
 async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtualMachine) {
+  if (cloudVirtualMachine.chargeType === ChargeType.PrePaid) {
+    throw new Error('billing task does not expect prepaid virtual machine')
+  }
   const latestBillingTime = new Date()
   // 当前时刻的准点 例如当前时间是 12:34:56.789  则 latestBillingTime 是 12:00:00.000 即 计费周期 12:00:00.000 - 13:00:00.000
   latestBillingTime.setMinutes(0)
@@ -63,7 +68,6 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
 
   const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
-      cloudVirtualMachineZoneId: cloudVirtualMachine.zoneId,
       _id: cloudVirtualMachine.virtualMachinePackageFamilyId
     })
 
@@ -74,9 +78,13 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   const virtualMachinePackage = await db.collection<VirtualMachinePackage>('VirtualMachinePackage')
     .findOne({
       virtualMachinePackageName: cloudVirtualMachine.virtualMachinePackageName,
-      virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
+      virtualMachinePackageFamilyId: cloudVirtualMachine.virtualMachinePackageFamilyId,
       chargeType: cloudVirtualMachine.chargeType
     })
+
+  if (!virtualMachinePackage) {
+    throw new Error('virtualMachinePackage not found')
+  }
 
 
   const cloudVirtualMachineBilling: CloudVirtualMachineBilling = {
@@ -90,14 +98,15 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     instanceName: cloudVirtualMachine.instanceName,
     region: cloudVirtualMachine.region,
     zoneId: cloudVirtualMachine.zoneId,
-    zoneName:cloudVirtualMachine.zoneName,
+    zoneName: cloudVirtualMachine.zoneName,
 
-    virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
+    virtualMachinePackageFamilyId: cloudVirtualMachine.virtualMachinePackageFamilyId,
     virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
     cloudProviderVirtualMachinePackageFamily: virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
     cloudProviderVirtualMachinePackageName: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
     cloudProviderZone: cloudVirtualMachine.cloudProviderZone,
     cloudProvider: cloudVirtualMachine.cloudProvider,
+
     detail: {
       instance: 0,
       network: 0,
@@ -106,6 +115,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     startAt: latestBillingTime,
     endAt: new Date(latestBillingTime.getTime() + CONSTANTS.BILLING_INTERVAL),
     amount: 0,
+
     state: CloudVirtualMachineBillingState.Pending,
     chargeType: cloudVirtualMachine.chargeType
   }
@@ -140,6 +150,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
   const sealosAccountRMB = await getSealosUserAccount(cloudVirtualMachine.sealosUserUid)
   const sealosaccountBalance = sealosAccountRMB - cloudVirtualMachineBilling.amount
 
+  // todo  添加欠费标识  
   if (sealosaccountBalance < 0 && cloudVirtualMachine.state === State.Running && cloudVirtualMachine.phase === Phase.Started) {
     const res = await db.collection<CloudVirtualMachine>('CloudVirtualMachine').findOneAndUpdate(
       {
@@ -200,21 +211,43 @@ billingJob.schedule(() => {
 })
 billingJob.resume()
 
-export function getCloudVirtualMachineOneHourFee(virtualMachinePackage: VirtualMachinePackage, internetMaxBandwidthOut: number, diskSize: number) {
+interface CloudVirtualMachineFee {
+  instance: number
+  network: number
+  disk: number
+  amount: number
+}
+
+export function getCloudVirtualMachineFee(virtualMachinePackage: VirtualMachinePackage, internetMaxBandwidthOut: number, diskSize: number, period: number = 1): CloudVirtualMachineFee {
+
   let instancePrice = new Decimal(virtualMachinePackage.instancePrice)
+    .mul(new Decimal(period))
 
   let diskPrice = new Decimal(virtualMachinePackage.diskPerG)
     .mul(new Decimal(diskSize))
+    .mul(new Decimal(period))
 
   const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, internetMaxBandwidthOut)
+
   let networkPrice =
     new Decimal(networkPricePerMbps)
       .mul(new Decimal(internetMaxBandwidthOut))
+      .mul(new Decimal(period))
 
 
 
-  const totalAmount = instancePrice.plus(networkPrice)
-    .plus(diskPrice).toNumber()
+  const totalAmount = instancePrice.
+    plus(networkPrice)
+    .plus(diskPrice)
+    .toNumber()
 
-  return totalAmount
+
+  const cloudVirtualMachineFee: CloudVirtualMachineFee = {
+    instance: instancePrice.toNumber(),
+    network: networkPrice.toNumber(),
+    disk: diskPrice.toNumber(),
+    amount: totalAmount
+  }
+
+  return cloudVirtualMachineFee
 }

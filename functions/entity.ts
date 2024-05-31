@@ -1,7 +1,7 @@
 
 import { ObjectId } from 'mongodb'
 import { VmVendors } from './type'
-import { DataDisk, SystemDisk } from 'tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models'
+import { RunInstancesRequest } from 'tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models'
 
 export enum Phase {
   Creating = 'Creating',
@@ -45,7 +45,7 @@ export enum ChargeType {
   PrePaid = 'prePaid'
 }
 
-export class CloudVirtualMachine {
+export class CloudVirtualMachine<T = { [key: string]: any }> {
   _id?: ObjectId
   // name?: string
   // description: string
@@ -97,62 +97,10 @@ export class CloudVirtualMachine {
   billingLockedAt: Date
   latestBillingTime: Date
   oweAt?: Date
-  metaData: {
-    [key: string]: any
-  }
+  metaData: T
 }
 
-export interface TencentMeta {
-  InstanceChargeType: string
-  Placement: {
-    Zone: string
-    ProjectId: number
-  }
-  InstanceType: string
-  ImageId: string
-  SystemDisk: SystemDisk
-  DataDisks?: Array<DataDisk>
-  VirtualPrivateCloud: {
-    VpcId: string
-    SubnetId: string
-  }
-  InternetAccessible?: {
-    InternetChargeType: string
-    InternetMaxBandwidthOut: number
-    PublicIpAssigned: boolean
-  }
-  InstanceCount: number
-  InstanceName: string
-  LoginSettings?: {
-    Password: string
-  }
-  SecurityGroupIds: Array<string>
-  EnhancedService: {
-    SecurityService: {
-      Enabled: boolean
-    }
-    MonitorService: {
-      Enabled: boolean
-    }
-    AutomationService: {
-      Enabled: boolean
-    }
-  }
-  ClientToken: string
-  TagSpecification: Array<{
-    ResourceType: string
-    Tags: Array<{
-      Key: string
-      Value: string
-    }>
-  }>
-  UserData: string
-  InstanceChargePrepaid?: {
-    Period: number
-    RenewFlag: string
-  }
-}
-
+export interface TencentMeta extends RunInstancesRequest { }
 
 export class TencentCloudVirtualMachine extends CloudVirtualMachine {
   declare metaData: TencentMeta
@@ -226,38 +174,12 @@ export enum CloudVirtualMachineBillingState {
   Done = 'Done',
 }
 
-// export class CloudVirtualMachineBilling {
-//   _id?: ObjectId
-//   instanceName: string
-//   namespace: string
-//   startAt: Date
-//   endAt: Date
-//   virtualMachinePackageFamily: string
-//   virtualMachinePackageName: string
-//   cloudProviderVirtualMachinePackageFamily: string
-//   cloudProviderVirtualMachinePackageName: string
-//   cloudProviderZone: string
-//   cloudProvider: VmVendors
-//   zoneId: ObjectId
-//   sealosUserId: string
-//   sealosUserUid: string
-//   sealosRegionUid: string
-//   sealosRegionDomain: string
-//   amount: number
-//   detail: {
-//     instance: number
-//     network: number
-//     disk: number
-//   }
-//   state: CloudVirtualMachineBillingState
-// }
-
-enum RenewalPlan {
+export enum RenewalPlan {
   Manual = 'Manual',
   Auto = 'Auto'
 }
 
-enum SubscriptionState {
+export enum SubscriptionState {
   Done = 'Done',
   Pending = 'Pending',
 }
@@ -269,7 +191,6 @@ export class CloudVirtualMachineSubscription {
   sealosRegionDomain: string
   sealosNamespace: string
   region: string
-  regionId: ObjectId
   zoneId: ObjectId
   zoneName: string
   instanceName: string
@@ -326,30 +247,44 @@ export class CloudVirtualMachineBilling {
   subscriptionId?: ObjectId
 }
 
-// 左闭右开
-export function getPriceForBandwidth(
-  vmPackage: VirtualMachinePackage,
-  bandwidth: number
-): number | null {
-  for (const tier of vmPackage.bandwidthPricingTiers) {
-    // 修改条件为左闭右开：[minBandwidth, maxBandwidth)
-    if (bandwidth >= tier.minBandwidth && (tier.maxBandwidth === null || bandwidth < tier.maxBandwidth)) {
-      return tier.pricePerMbps
-    }
-  }
-  return null // 没有找到匹配的带宽区间，返回 null
+export class ErrorLogs {
+  _id?: ObjectId
+  error: string
+  createTime: Date
+  errorMessage: string
+  errorDetails: string
+  errorLevel: 'Warning' | 'Error' | 'Fatal'
+  sealosUserId: string
+  sealosUserUid: string
+  instanceName: string
+  serviceName: string
 }
 
-// 左开右闭
+
+// 左闭右开
 // export function getPriceForBandwidth(
 //   vmPackage: VirtualMachinePackage,
 //   bandwidth: number
 // ): number | null {
 //   for (const tier of vmPackage.bandwidthPricingTiers) {
-//     // 修改条件为左开右闭：(minBandwidth, maxBandwidth]
-//     if (bandwidth > tier.minBandwidth && (tier.maxBandwidth === null || bandwidth <= tier.maxBandwidth)) {
-//       return tier.pricePerMbps;
+//     // 修改条件为左闭右开：[minBandwidth, maxBandwidth)
+//     if (bandwidth >= tier.minBandwidth && (tier.maxBandwidth === null || bandwidth < tier.maxBandwidth)) {
+//       return tier.pricePerMbps
 //     }
 //   }
-//   return null; // 没有找到匹配的带宽区间，返回 null
+//   return null // 没有找到匹配的带宽区间，返回 null
 // }
+
+// 左开右闭
+export function getPriceForBandwidth(
+  vmPackage: VirtualMachinePackage,
+  bandwidth: number
+): number | null {
+  for (const tier of vmPackage.bandwidthPricingTiers) {
+    // 修改条件为左开右闭：(minBandwidth, maxBandwidth]
+    if (bandwidth > tier.minBandwidth && (tier.maxBandwidth === null || bandwidth <= tier.maxBandwidth)) {
+      return tier.pricePerMbps
+    }
+  }
+  return null // 没有找到匹配的带宽区间，返回 null
+}

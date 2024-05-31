@@ -67,18 +67,21 @@ export default async function (ctx: FunctionContext) {
     find({ regionId: region._id }).toArray()
 
   for (const zone of zones) {
-    const zoneDetail = await getZoneDetails(zone)
+    const postPaidByHourZoneDetail = await getZoneDetails(zone, ChargeType.PostPaidByHour)
+    const prePaidZoneDetail = await getZoneDetails(zone, ChargeType.PrePaid)
+
 
     if (zone.name === 'Guangzhou-7') {
       continue
     }
 
-    postPaidByHourRegionDetail.zone.push(zoneDetail)
-    prePaidRegionDetail.zone.push(zoneDetail)
+    postPaidByHourRegionDetail.zone.push(postPaidByHourZoneDetail)
+    prePaidRegionDetail.zone.push(prePaidZoneDetail)
+
   }
 
   regionList.push(postPaidByHourRegionDetail)
-  // regionList.push(prePaidRegionDetail)
+  regionList.push(prePaidRegionDetail)
 
   const data: IResponse = {
     data: regionList,
@@ -89,7 +92,7 @@ export default async function (ctx: FunctionContext) {
 
 }
 
-async function getZoneDetails(zone: CloudVirtualMachineZone) {
+async function getZoneDetails(zone: CloudVirtualMachineZone, chargeType: ChargeType) {
   interface ArchWithType {
     virtualMachineArch: Arch
     virtualMachineTypes: VirtualMachineType[]
@@ -104,6 +107,7 @@ async function getZoneDetails(zone: CloudVirtualMachineZone) {
     {
       $match: {
         cloudVirtualMachineZoneId: zone._id,
+        chargeType: chargeType
       },
     },
     {
@@ -128,12 +132,18 @@ async function getZoneDetails(zone: CloudVirtualMachineZone) {
     }
     for (const virtualMachineType of archWithType.virtualMachineTypes) {
       const virtualMachineTypeDetail: VirtualMachineTypeDetail = {
-        virtualMachineType,
-        virtualMachinePackageFamily: (await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').distinct('virtualMachinePackageFamily', {
-          cloudVirtualMachineZoneId: zone._id,
-          virtualMachineArch: archWithType.virtualMachineArch,
-          virtualMachineType
-        }))
+        virtualMachineType: virtualMachineType,
+        virtualMachinePackageFamily: (
+          await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
+            .distinct('virtualMachinePackageFamily',
+              {
+                cloudVirtualMachineZoneId: zone._id,
+                virtualMachineArch: archWithType.virtualMachineArch,
+                virtualMachineType: virtualMachineType,
+                chargeType: chargeType
+              }
+            )
+        )
       }
       archDetail.virtualMachineType.push(virtualMachineTypeDetail)
     }

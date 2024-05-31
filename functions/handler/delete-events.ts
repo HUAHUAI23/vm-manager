@@ -1,4 +1,4 @@
-import { CloudVirtualMachine, Phase, State } from "../entity"
+import { ChargeType, CloudVirtualMachine, Phase, State } from "../entity"
 import { db } from "../db"
 import { VmVendors, getVmVendor } from "../type"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
@@ -13,6 +13,10 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
         case VmVendors.Tencent:
             console.log(2222)
             const instanceDetails = await TencentVmOperation.getVmDetailsByInstanceName(vm.instanceName)
+
+            if (vm.chargeType === ChargeType.PrePaid) {
+                throw new Error('PrePaid instance can not be deleted')
+            }
 
             if (
                 instanceDetails &&

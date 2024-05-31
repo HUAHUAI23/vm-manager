@@ -2,6 +2,11 @@ export enum VmVendors {
     Tencent = 'tencent'
 }
 
+export enum StoppedMode {
+    KEEP_CHARGING = 'KEEP_CHARGING',
+    STOP_CHARGING = 'STOP_CHARGING'
+}
+
 
 
 export function getVmVendor(vmTypeName: string): VmVendors | null {
@@ -13,16 +18,18 @@ export function getVmVendor(vmTypeName: string): VmVendors | null {
 }
 
 /**
- * 从字符串中获取枚举值的通用函数。
+ * 检查值是否存在于枚举中。
  * 
  * @param enumObj 枚举对象
- * @param key 枚举的字符串键
- * @returns 对应的枚举值
+ * @param value 要检查的值
+ * @returns 如果值存在于枚举中，返回该值；否则抛出错误
  * @throws 如果未找到匹配项，将抛出错误
  */
-export function getEnumValueFromString<T extends Record<string, any>>(enumObj: T, key: string): T[keyof T] {
-    if (key in enumObj) {
-        return enumObj[key as keyof T]
+export function isValueInEnum<T extends Record<string, any>>(enumObj: T, value: any): T[keyof T] {
+    const values = Object.values(enumObj)
+    if (values.includes(value)) {
+        return value as T[keyof T]
     }
-    throw new Error(`Invalid key: '${key}' does not exist in the given enum.`)
+    throw new Error(`Invalid value: '${value}' does not exist in the given enum.`)
 }
+

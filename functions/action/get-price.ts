@@ -1,15 +1,18 @@
-import { validateDTO, verifyBearerToken } from '../utils'
+import { Schema, validateDTO, validatePeriod, verifyBearerToken } from '../utils'
 import { db } from '../db'
 const Decimal = require('decimal.js')
 import { Arch, ChargeType, CloudVirtualMachineZone, Region, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType, getPriceForBandwidth } from '../entity'
+import { isValueInEnum } from '@/type'
 
 interface IRequestBody {
+  virtualMachineArch: Arch
+  virtualMachineType: VirtualMachineType
+
   virtualMachinePackageFamily: string
   virtualMachinePackageName: string
 
-  virtualMachineType: VirtualMachineType
-  virtualMachineArch: Arch
-  chareType: ChargeType
+  chargeType: ChargeType
+  period?: number
 
   imageId: string
   systemDisk: number
@@ -29,21 +32,24 @@ interface IResponse {
   diskPrice: number
 }
 
-const iRequestBodySchema = {
-  virtualMachinePackageName: value => typeof value === 'string',
-  virtualMachinePackageFamily: value => typeof value === 'string',
-  imageId: value => typeof value === 'string',
-  systemDisk: value => typeof value === 'number' && Number.isInteger(value),
-  dataDisks: value => Array.isArray(value) && value.every(item => typeof item === 'number' && Number.isInteger(item)),
-  internetMaxBandwidthOut: value => typeof value === 'number',
-  loginName: value => typeof value === 'string' || value === undefined,
-  loginPassword: value => typeof value === 'string',
-  zone: value => typeof value === 'string',
-  metaData: value => typeof value === 'object' && value !== null || value === undefined,
-  virtualMachineType: () => true,
-  virtualMachineArch: () => true,
-  chareType: () => true
+const iRequestBodySchema: Schema = {
+  virtualMachineArch: (value) => Object.values(Arch).includes(value),
+  virtualMachineType: (value) => Object.values(VirtualMachineType).includes(value),
+  virtualMachinePackageFamily: (value) => typeof value === 'string',
+  virtualMachinePackageName: (value) => typeof value === 'string',
+  chargeType: (value) => Object.values(ChargeType).includes(value),
+  period: { optional: true, validate: (value) => typeof value === 'number' },
+  imageId: (value) => typeof value === 'string',
+  systemDisk: (value) => typeof value === 'number',
+  dataDisks: (value) => Array.isArray(value) && value.every(v => typeof v === 'number'),
+  internetMaxBandwidthOut: (value) => typeof value === 'number',
+  loginName: { optional: true, validate: (value) => typeof value === 'string' },
+  loginPassword: (value) => typeof value === 'string',
+  zone: (value) => typeof value === 'string',
+  metaData: { optional: true, validate: (value) => typeof value === 'object' && value !== null && !Array.isArray(value) },
 }
+
+
 
 export default async function (ctx: FunctionContext) {
   const ok = verifyBearerToken(ctx.headers.authorization)
@@ -72,7 +78,14 @@ export default async function (ctx: FunctionContext) {
     return { data: null, error: 'CloudVirtualMachineZone not found' }
   }
 
-  const chargeType = ChargeType.PostPaidByHour
+  let chargeType: ChargeType
+
+  try {
+    chargeType = isValueInEnum(ChargeType, body.chargeType)
+  } catch (error) {
+    return { data: null, error: 'chargeType not found' }
+  }
+
   const virtualMachinePackageFamily = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily')
     .findOne({
       cloudVirtualMachineZoneId: cloudVirtualMachineZone._id,
@@ -80,7 +93,6 @@ export default async function (ctx: FunctionContext) {
       virtualMachineType: body.virtualMachineType,
       virtualMachineArch: body.virtualMachineArch,
       chargeType: chargeType
-
     })
 
   if (!virtualMachinePackageFamily) {
@@ -108,18 +120,32 @@ export default async function (ctx: FunctionContext) {
     body.dataDisks ? body.dataDisks.reduce((acc, curr) => acc.plus(curr), new Decimal(0)) : 0
   )
 
+  const period = body.period ?? 1
+
+  try {
+    validatePeriod(body.period)
+  } catch (error) {
+    return { data: null, error: error.message }
+  }
+
   // 计算实例价格
-  const instancePrice = new Decimal(virtualMachinePackage.instancePrice)
+
+  const instancePrice = new Decimal(virtualMachinePackage.instancePrice).
+    mul(new Decimal(period))
 
   // 计算硬盘价格
   const diskPrice = diskSize.mul(new Decimal(virtualMachinePackage.diskPerG))
+    .mul(new Decimal(period))
+
   let networkPrice = new Decimal(0)
 
   const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, body.internetMaxBandwidthOut)
+
   // 根据带宽计算网络价格
   networkPrice =
     new Decimal(networkPricePerMbps)
       .mul(new Decimal(body.internetMaxBandwidthOut))
+      .mul(new Decimal(period))
 
   // 将 Decimal 对象转换为数字类型
   price.diskPrice = diskPrice.toNumber()

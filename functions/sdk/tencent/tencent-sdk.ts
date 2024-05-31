@@ -1,7 +1,8 @@
 
-import { Instance, InstanceTypeConfig, InstanceTypeQuotaItem } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
+import { DescribeAccountQuotaResponse, Instance, InstanceTypeConfig, InstanceTypeQuotaItem, RunInstancesRequest } from "tencentcloud-sdk-nodejs/tencentcloud/services/cvm/v20170312/cvm_models"
 import * as tencentcloud from "tencentcloud-sdk-nodejs"
 import { ChargeType } from "@/entity"
+import { StoppedMode } from "@/type"
 
 // 导入对应产品模块的client models。
 const CvmClient = tencentcloud.cvm.v20170312.Client
@@ -30,7 +31,7 @@ const client = new CvmClient({
 export class TencentVmOperation {
     private static client = client
 
-    static async create(params): Promise<string> {
+    static async create(params: RunInstancesRequest): Promise<string> {
         const res = await client.RunInstances(params)
         const instanceId = res.InstanceIdSet[0]
         return instanceId
@@ -45,7 +46,7 @@ export class TencentVmOperation {
         await TencentVmOperation.client.StartInstances(params)
     }
 
-    static async stop(id: string): Promise<void> {
+    static async stop(id: string, stoppedMode?: StoppedMode): Promise<void> {
         const params = {
             "InstanceIds": [
                 id,
@@ -53,6 +54,11 @@ export class TencentVmOperation {
             "StopType": "SOFT_FIRST",
             "StoppedMode": "STOP_CHARGING"
         }
+
+        if (stoppedMode && stoppedMode === StoppedMode.KEEP_CHARGING) {
+            params.StoppedMode = "KEEP_CHARGING"
+        }
+
         await TencentVmOperation.client.StopInstances(params)
     }
 
@@ -175,8 +181,8 @@ export class TencentVmOperation {
         const res = await TencentVmOperation.client.DescribeInstanceTypeConfigs(params)
         return res.InstanceTypeConfigSet[0]
     }
-    static async describeZoneInstanceConfigInfo(zone: string, instanceFamily: string, instanceType: string, chargeType: string): Promise<InstanceTypeQuotaItem> {
-        let instanceChargeType
+    static async describeZoneInstanceConfigInfo(zone: string, instanceFamily: string, instanceType: string, chargeType: ChargeType): Promise<InstanceTypeQuotaItem> {
+        let instanceChargeType: string
 
         if (chargeType === ChargeType.PrePaid) {
             instanceChargeType = "PREPAID"
@@ -257,6 +263,35 @@ export class TencentVmOperation {
         }
         const res = await TencentVmOperation.client.DescribeZoneInstanceConfigInfos(params)
         return res.InstanceTypeQuotaSet
+    }
+
+    static async describeAccountQuota(chargeType?: ChargeType) {
+        const params = {
+            "Filters": [
+                {
+                    "Name": "zone",
+                    "Values": [
+                        "ap-guangzhou-6"
+                    ]
+                },
+                {
+                    "Name": "quota-type",
+                    "Values": [
+                        "PostPaidQuotaSet" // PostPaidQuotaSet,DisasterRecoverGroupQuotaSet,PrePaidQuotaSet,SpotPaidQuotaSet
+                    ]
+                }
+
+            ]
+        }
+        if (chargeType && chargeType === ChargeType.PrePaid) {
+            params.Filters[1].Values[0] = 'PrePaidQuotaSet'
+        }
+
+        const res: DescribeAccountQuotaResponse =
+            await TencentVmOperation.client.DescribeAccountQuota(params)
+
+        return res
+
     }
 
 }

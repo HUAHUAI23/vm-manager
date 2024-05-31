@@ -1,9 +1,9 @@
 import { VmVendors, getVmVendor } from '../type'
 import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
-import {  CloudVirtualMachineZone, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
+import { ChargeType, CloudVirtualMachineZone, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
 import { db } from '../db'
 import { TencentVm } from './tencent/tencent-vm'
-import { getCloudVirtualMachineOneHourFee } from '../billing-task'
+import { getCloudVirtualMachineFee } from '../billing-task'
 
 interface IRequestBody {
     instanceName: string
@@ -74,14 +74,15 @@ export default async function (ctx: FunctionContext) {
                     chargeType: tencentVm.chargeType
                 })
 
-            const cloudVirtualMachineOneHourFee = getCloudVirtualMachineOneHourFee(
+            const cloudVirtualMachineOneHourFee: number = getCloudVirtualMachineFee(
                 virtualMachinePackage,
                 tencentVm.internetMaxBandwidthOut ? tencentVm.internetMaxBandwidthOut : 0,
                 tencentVm.disk
-            )
+            ).amount
+
             const sealosAccountRMB = await getSealosUserAccount(ok.sealosUserUid)
 
-            if (sealosAccountRMB < cloudVirtualMachineOneHourFee) {
+            if (sealosAccountRMB < cloudVirtualMachineOneHourFee && tencentVm.chargeType === ChargeType.PostPaidByHour) {
                 return { data: null, error: 'Insufficient balance' }
             }
 
