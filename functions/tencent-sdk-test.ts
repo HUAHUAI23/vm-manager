@@ -353,7 +353,7 @@ async function ResetInstancesPassword() {
 
 export default async function (ctx: FunctionContext) {
   console.log("Hello World")
-  await create()
+  // await create()
   // await InquiryPriceRunInstances()
   // await StartInstances()
   // await DescribeInstancesStatus()
