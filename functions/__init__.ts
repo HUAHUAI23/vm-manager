@@ -4,6 +4,7 @@ import { VmVendors } from './type'
 import { client, db } from './db'
 import { reconcile } from './reconcile'
 import { billingJob } from './billing-task'
+import { ObjectId } from 'mongodb'
 
 
 
@@ -12,6 +13,7 @@ import { billingJob } from './billing-task'
 async function createRegionAndZone() {
 
   const existed = await db.collection<Region>('Region').countDocuments()
+
   if (existed) {
     return
   }
@@ -78,29 +80,30 @@ async function createRegionAndZone() {
       }
     ]
 
+    // 包年包月
     const BandwidthPricingTierListPre: BandwidthPricingTier[] = [
       {
         minBandwidth: 0,
         maxBandwidth: 2,
-        pricePerMbps: 10,
+        pricePerMbps: 14,
       },
       {
         minBandwidth: 2,
         maxBandwidth: 5,
-        pricePerMbps: 12.5,
+        pricePerMbps: 17,
       },
       {
         minBandwidth: 5,
         maxBandwidth: null,
-        pricePerMbps: 45,
+        pricePerMbps: 63,
       }
-
     ]
 
 
     const virtualMachinePackageFamily: VirtualMachinePackageFamily[] = [
       // 按量计费
       // guangzhou6
+
       // x86 计算
       // 特惠
       {
@@ -203,7 +206,6 @@ async function createRegionAndZone() {
     )
 
     // 包月
-    // 按量
     const TS5_Pre = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne(
       { cloudVirtualMachineZoneId: guangzhou6._id, cloudProviderVirtualMachinePackageFamily: 'TS5', chargeType: ChargeType.PrePaid },
       { session }
@@ -366,21 +368,123 @@ async function createRegionAndZone() {
       },
 
       // 包月
+      // TS5
       {
         virtualMachinePackageFamilyId: TS5_Pre._id,
         virtualMachinePackageName: 'sealos-1',
         cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM4',
-        instancePrice: 50,
-        diskPerG: 0.2,
+        instancePrice: 66.24,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-2',
+        cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM8',
+        instancePrice: 99.36,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-3',
+        cloudProviderVirtualMachinePackageName: 'TS5.LARGE8',
+        instancePrice: 132.48,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-4',
+        cloudProviderVirtualMachinePackageName: 'TS5.LARGE16',
+        instancePrice: 198.72,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-5',
+        cloudProviderVirtualMachinePackageName: 'TS5.2XLARGE16',
+        instancePrice: 250.56,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-6',
+        cloudProviderVirtualMachinePackageName: 'TS5.2XLARGE32',
+        instancePrice: 397.44,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-7',
+        cloudProviderVirtualMachinePackageName: 'TS5.4XLARGE32',
+        instancePrice: 529.92,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-8',
+        cloudProviderVirtualMachinePackageName: 'TS5.4XLARGE64',
+        instancePrice: 794.88,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-9',
+        cloudProviderVirtualMachinePackageName: 'TS5.8XLARGE64',
+        instancePrice: 1059.84,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-10',
+        cloudProviderVirtualMachinePackageName: 'TS5.8XLARGE128',
+        instancePrice: 1589.76,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+
+      // TM5
+      {
+        virtualMachinePackageFamilyId: TM5_Pre._id,
+        virtualMachinePackageName: 'sealos-1',
+        cloudProviderVirtualMachinePackageName: 'TM5.8XLARGE256',
+        instancePrice: 2027.52,
+        diskPerG: 0.3,
         bandwidthPricingTiers: BandwidthPricingTierListPre,
         chargeType: ChargeType.PrePaid
       },
       {
         virtualMachinePackageFamilyId: TM5_Pre._id,
-        virtualMachinePackageName: 'sealos-1',
+        virtualMachinePackageName: 'sealos-2',
+        cloudProviderVirtualMachinePackageName: 'TM5.4XLARGE128',
+        instancePrice: 1013.76,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TM5_Pre._id,
+        virtualMachinePackageName: 'sealos-3',
         cloudProviderVirtualMachinePackageName: 'TM5.2XLARGE64',
-        instancePrice: 300,
-        diskPerG: 0.2,
+        instancePrice: 506.88,
+        diskPerG: 0.3,
         bandwidthPricingTiers: BandwidthPricingTierListPre,
         chargeType: ChargeType.PrePaid
       },
@@ -394,16 +498,223 @@ async function createRegionAndZone() {
   } finally {
     await session.endSession()
   }
+}
 
+async function createPrePaid() {
+  const session = client.startSession()
+
+  const BandwidthPricingTierListPre: BandwidthPricingTier[] = [
+    {
+      minBandwidth: 0,
+      maxBandwidth: 2,
+      pricePerMbps: 14,
+    },
+    {
+      minBandwidth: 2,
+      maxBandwidth: 5,
+      pricePerMbps: 17,
+    },
+    {
+      minBandwidth: 5,
+      maxBandwidth: null,
+      pricePerMbps: 63,
+    }
+  ]
+
+  try {
+    session.startTransaction()
+
+    const guangzhou6 = {
+      _id: new ObjectId('663f518c6aec6002bfe2f7c9')
+    }
+
+    const pre = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne({
+      chargeType: ChargeType.PrePaid
+    })
+
+    console.log(pre)
+    if (pre) {
+      console.log('prepaid existed')
+      return
+    }
+
+    const family: VirtualMachinePackageFamily[] = [
+      {
+        cloudVirtualMachineZoneId: guangzhou6._id,
+        cloudProviderVirtualMachinePackageFamily: 'TS5',
+        virtualMachinePackageFamily: 'highPerformance',
+        virtualMachineArch: Arch.X86_64,
+        virtualMachineType: VirtualMachineType.CostEffective,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        cloudVirtualMachineZoneId: guangzhou6._id,
+        cloudProviderVirtualMachinePackageFamily: 'TM5',
+        virtualMachinePackageFamily: 'highMemory',
+        virtualMachineArch: Arch.X86_64,
+        virtualMachineType: VirtualMachineType.CostEffective,
+        chargeType: ChargeType.PrePaid
+      },
+    ]
+
+    await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').insertMany(
+      family, { session }
+    )
+
+    const TS5_Pre = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne(
+      { cloudVirtualMachineZoneId: guangzhou6._id, cloudProviderVirtualMachinePackageFamily: 'TS5', chargeType: ChargeType.PrePaid },
+      { session }
+    )
+
+    const TM5_Pre = await db.collection<VirtualMachinePackageFamily>('VirtualMachinePackageFamily').findOne(
+      { cloudVirtualMachineZoneId: guangzhou6._id, cloudProviderVirtualMachinePackageFamily: 'TM5', chargeType: ChargeType.PrePaid },
+      { session }
+    )
+
+    const packageList: VirtualMachinePackage[] = [
+      // TS5
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-1',
+        cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM4',
+        instancePrice: 66.24,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-2',
+        cloudProviderVirtualMachinePackageName: 'TS5.MEDIUM8',
+        instancePrice: 99.36,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-3',
+        cloudProviderVirtualMachinePackageName: 'TS5.LARGE8',
+        instancePrice: 132.48,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-4',
+        cloudProviderVirtualMachinePackageName: 'TS5.LARGE16',
+        instancePrice: 198.72,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-5',
+        cloudProviderVirtualMachinePackageName: 'TS5.2XLARGE16',
+        instancePrice: 250.56,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-6',
+        cloudProviderVirtualMachinePackageName: 'TS5.2XLARGE32',
+        instancePrice: 397.44,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-7',
+        cloudProviderVirtualMachinePackageName: 'TS5.4XLARGE32',
+        instancePrice: 529.92,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-8',
+        cloudProviderVirtualMachinePackageName: 'TS5.4XLARGE64',
+        instancePrice: 794.88,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-9',
+        cloudProviderVirtualMachinePackageName: 'TS5.8XLARGE64',
+        instancePrice: 1059.84,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TS5_Pre._id,
+        virtualMachinePackageName: 'sealos-10',
+        cloudProviderVirtualMachinePackageName: 'TS5.8XLARGE128',
+        instancePrice: 1589.76,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+
+      // TM5
+      {
+        virtualMachinePackageFamilyId: TM5_Pre._id,
+        virtualMachinePackageName: 'sealos-1',
+        cloudProviderVirtualMachinePackageName: 'TM5.8XLARGE256',
+        instancePrice: 2027.52,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TM5_Pre._id,
+        virtualMachinePackageName: 'sealos-2',
+        cloudProviderVirtualMachinePackageName: 'TM5.4XLARGE128',
+        instancePrice: 1013.76,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+      {
+        virtualMachinePackageFamilyId: TM5_Pre._id,
+        virtualMachinePackageName: 'sealos-3',
+        cloudProviderVirtualMachinePackageName: 'TM5.2XLARGE64',
+        instancePrice: 506.88,
+        diskPerG: 0.3,
+        bandwidthPricingTiers: BandwidthPricingTierListPre,
+        chargeType: ChargeType.PrePaid
+      },
+
+    ]
+
+    await db.collection<VirtualMachinePackage>('VirtualMachinePackage').insertMany(packageList, { session })
+
+    await session.commitTransaction()
+  } catch (e) {
+    console.error(e)
+    await session.abortTransaction()
+    throw e
+  } finally {
+    await session.endSession()
+  }
 }
 
 
 export default async function (ctx: FunctionContext) {
   await createRegionAndZone()
-  console.log('reconcile job isRunning: ', reconcile.reconcileStateJob.isRunning())
-  console.log('billing job isRunning: ', billingJob.isRunning())
-  console.log('EventEmitter: ', util.inspect(reconcile.eventEmitter, { showHidden: false, depth: 2 }))
-  console.log('init...')
+  // await createPrePaid()
+  console.info('reconcile job isRunning: ', reconcile.reconcileStateJob.isRunning())
+  console.info('billing job isRunning: ', billingJob.isRunning())
+  console.info('EventEmitter: ', util.inspect(reconcile.eventEmitter, { showHidden: false, depth: 2 }))
+  console.info('init...')
 
   return { data: 'hi, laf' }
 }

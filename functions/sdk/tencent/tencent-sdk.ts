@@ -33,7 +33,8 @@ export class TencentVmOperation {
 
     static async create(params: RunInstancesRequest): Promise<string> {
         const res = await client.RunInstances(params)
-        const instanceId = res.InstanceIdSet[0]
+        console.info('tencent sdk create:\n', JSON.stringify(res, null, 2))
+        const instanceId = res.InstanceIdSet?.[0]
         return instanceId
     }
 
@@ -83,7 +84,7 @@ export class TencentVmOperation {
     }
 
     static async change(params) {
-        console.log('TencentVmOperation change', params)
+        console.debug('TencentVmOperation change', params)
     }
 
     static async getVmDetails(id: string): Promise<Instance> {
@@ -161,6 +162,7 @@ export class TencentVmOperation {
 
         return InstanceTypeList
     }
+
     static async getInstanceTypeDetails(instanceType: string): Promise<InstanceTypeConfig> {
         const params = {
             Filters: [
@@ -181,6 +183,7 @@ export class TencentVmOperation {
         const res = await TencentVmOperation.client.DescribeInstanceTypeConfigs(params)
         return res.InstanceTypeConfigSet[0]
     }
+
     static async describeZoneInstanceConfigInfo(zone: string, instanceFamily: string, instanceType: string, chargeType: ChargeType): Promise<InstanceTypeQuotaItem> {
         let instanceChargeType: string
 

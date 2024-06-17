@@ -40,6 +40,7 @@ export enum ChangeType {
   ChangeInstanceType = 'ChangeInstanceType',
   ChangeDisk = 'ChangeDisk'
 }
+
 export enum ChargeType {
   PostPaidByHour = 'postPaidByHour',
   PrePaid = 'prePaid'
@@ -52,6 +53,8 @@ export class CloudVirtualMachine<T = { [key: string]: any }> {
   phase: Phase
   state: State
 
+  // 后续去除 namespace
+  // sealosNamespace: string
   sealosNamespace: string
   sealosUserId: string
   sealosUserUid: string
@@ -74,6 +77,7 @@ export class CloudVirtualMachine<T = { [key: string]: any }> {
   publicIpAddresses?: string[]
 
   instanceName: string
+  // cloudInstanceId: string
   instanceId?: string
   imageId: string
 
@@ -157,6 +161,10 @@ export class BandwidthPricingTier {
   pricePerMbps: number // 每Mbps的价格，单位：元/Mbps/月
 }
 
+export class DiscountInfo {
+  durationInMonths: number
+  discountRate: number // 折扣率，如0.6表示6折
+}
 
 export class VirtualMachinePackage {
   _id?: ObjectId
@@ -167,6 +175,7 @@ export class VirtualMachinePackage {
   diskPerG: number
   bandwidthPricingTiers: BandwidthPricingTier[]
   chargeType: ChargeType
+  discountInfo?: DiscountInfo[]
 }
 
 export enum CloudVirtualMachineBillingState {
@@ -245,6 +254,7 @@ export class CloudVirtualMachineBilling {
   state: CloudVirtualMachineBillingState
   chargeType: ChargeType
   subscriptionId?: ObjectId
+  uuid?: string
 }
 
 export class ErrorLogs {
@@ -280,6 +290,8 @@ export function getPriceForBandwidth(
   vmPackage: VirtualMachinePackage,
   bandwidth: number
 ): number | null {
+  if (bandwidth === 0) return 0
+
   for (const tier of vmPackage.bandwidthPricingTiers) {
     // 修改条件为左开右闭：(minBandwidth, maxBandwidth]
     if (bandwidth > tier.minBandwidth && (tier.maxBandwidth === null || bandwidth <= tier.maxBandwidth)) {

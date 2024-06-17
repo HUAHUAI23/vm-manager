@@ -123,12 +123,21 @@ export default async function (ctx: FunctionContext) {
   const period = body.period ?? 1
 
   try {
-    validatePeriod(body.period)
+    validatePeriod(period)
   } catch (error) {
     return { data: null, error: error.message }
   }
 
   // 计算实例价格
+
+  // 折扣计算
+  // let discountRate = 1
+  // if (chargeType === ChargeType.PrePaid && virtualMachinePackage.discountInfo) {
+  //   const discount = virtualMachinePackage.discountInfo.find(d => d.durationInMonths === period)
+  //   if (discount) {
+  //     discountRate = discount.discountRate
+  //   }
+  // }
 
   const instancePrice = new Decimal(virtualMachinePackage.instancePrice).
     mul(new Decimal(period))
@@ -140,6 +149,10 @@ export default async function (ctx: FunctionContext) {
   let networkPrice = new Decimal(0)
 
   const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, body.internetMaxBandwidthOut)
+
+  if (networkPricePerMbps === null) {
+    return { data: null, error: 'networkPricePerMbps not found' }
+  }
 
   // 根据带宽计算网络价格
   networkPrice =

@@ -13,15 +13,13 @@ export async function handlerStartEvents(vm: CloudVirtualMachine) {
     switch (vendorType) {
         case VmVendors.Tencent:
 
-            console.log(111)
-
             const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
             if (!instanceDetails) {
                 throw new Error(`The instanceName ${vm.instanceName} not found in Tencent, can not start it`)
             }
 
             if (instanceDetails.LatestOperation !== 'StartInstances' || instanceDetails.LatestOperationState === 'FAILED') {
-                console.log(333)
+                console.info(`start ${vm.instanceName}`)
                 await TencentVmOperation.start(vm.instanceId)
 
                 await sleep(CONSTANTS.SLEEP_TIME)

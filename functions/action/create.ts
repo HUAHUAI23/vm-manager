@@ -44,7 +44,7 @@ const iRequestBodySchema: Schema = {
     loginPassword: (value) => typeof value === 'string',
     zone: (value) => typeof value === 'string',
     metaData: { optional: true, validate: (value) => typeof value === 'object' && value !== null && !Array.isArray(value) },
-};
+}
 
 
 export default async function (ctx: FunctionContext) {
@@ -137,7 +137,6 @@ export default async function (ctx: FunctionContext) {
     }
 
     const sealosAccountRMB = await getSealosUserAccount(ok.sealosUserUid)
-    console.log('test sealosAccountRMB', sealosAccountRMB)
 
     if (sealosAccountRMB < cloudVirtualMachineFee) {
         return { data: null, error: 'Insufficient balance' }
@@ -283,15 +282,15 @@ export default async function (ctx: FunctionContext) {
                     Period: period,
                     RenewFlag: "NOTIFY_AND_MANUAL_RENEW"
                 }
-
-
-                // test
-                tencentCloudVirtualMachine.metaData.DryRun = true
             }
+
+            // test
+            tencentCloudVirtualMachine.metaData.DryRun = true
 
             try {
                 await TencentVm.create(tencentCloudVirtualMachine, period)
             } catch (error) {
+                console.error('create vm error', error.stack)
                 return { data: null, error: `create vm ${tencentCloudVirtualMachine.instanceName} error` }
             }
 

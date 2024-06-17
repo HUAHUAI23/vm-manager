@@ -34,4 +34,8 @@ export default class CONSTANTS {
         return process.env.CRYPTO_KEY
     }
 
+    // 人民币 对应 sealos 币 比例
+    static get RMB_TO_SEALOS(): number {
+        return 1000000
+    }
 }

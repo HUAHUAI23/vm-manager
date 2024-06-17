@@ -11,7 +11,6 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
     const vendorType: VmVendors = getVmVendor(vendor)
     switch (vendorType) {
         case VmVendors.Tencent:
-            console.log(2222)
             const instanceDetails = await TencentVmOperation.getVmDetailsByInstanceName(vm.instanceName)
 
             if (vm.chargeType === ChargeType.PrePaid) {
@@ -23,7 +22,7 @@ export async function handlerDeleteEvents(vm: CloudVirtualMachine) {
                 (instanceDetails.LatestOperation !== 'TerminateInstances'
                     || instanceDetails.LatestOperationState === 'FAILED')
             ) {
-                console.log(333)
+                console.info(`delete ${vm.instanceName}`)
                 await TencentVmOperation.delete(instanceDetails.InstanceId)
 
                 await sleep(CONSTANTS.SLEEP_TIME)

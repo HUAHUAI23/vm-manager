@@ -13,8 +13,6 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
     switch (vendorType) {
         case VmVendors.Tencent:
 
-            console.log(111)
-
             const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
 
             if (!instanceDetails) {
@@ -22,7 +20,7 @@ export async function handleRestartEvents(vm: CloudVirtualMachine) {
             }
 
             if (instanceDetails.LatestOperation !== 'RebootInstances' || instanceDetails.LatestOperationState === 'FAILED') {
-                console.log(333)
+                console.info(`restart ${vm.instanceName}`)
                 await TencentVmOperation.restart(vm.instanceId)
 
                 await sleep(CONSTANTS.SLEEP_TIME)

@@ -1,16 +1,21 @@
 import { db } from '../../db'
 import { client as mongoClient } from '../../db'
-import { State, CloudVirtualMachine, Phase, TencentCloudVirtualMachine, ChargeType, VirtualMachinePackage, CloudVirtualMachineSubscription, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, VirtualMachinePackageFamily, Region, RenewalPlan, SubscriptionState, ErrorLogs } from "../../entity"
+import { State, CloudVirtualMachine, Phase, TencentCloudVirtualMachine, ChargeType, VirtualMachinePackage, CloudVirtualMachineSubscription, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, VirtualMachinePackageFamily, RenewalPlan, SubscriptionState, ErrorLogs } from "../../entity"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 import { pgPool } from '../../db'
-import { deductSealosBalance, validationEncrypt } from '@/utils'
+import { AccountTransaction, AccountTransactionMessage, AccountTransactionType, deductSealosBalance, validationEncrypt } from '@/utils'
 import { getCloudVirtualMachineFee } from '@/billing-task'
+import { v4 as uuidv4 } from 'uuid'
+import { QueryConfig } from 'pg'
+import Decimal from 'decimal.js'
+import CONSTANTS from '@/constants'
 
 export class TencentVm {
   static async create(vm: TencentCloudVirtualMachine, period?: number): Promise<void> {
     if (vm.chargeType === ChargeType.PrePaid) {
 
       const instanceList = await TencentVmOperation.getVmDetailsListByInstanceName(vm.instanceName)
+
       if (instanceList.length > 0) {
         throw new Error(`The instanceName ${vm.instanceName} have created`)
       }
@@ -42,7 +47,6 @@ export class TencentVm {
         vm.disk,
         period
       )
-      console.log(vmFee)
 
       const ok = await validationEncrypt(vm.sealosUserUid)
 
@@ -50,19 +54,16 @@ export class TencentVm {
         throw new Error('sealos account validate encrypt failed')
       }
 
-
-      // pg transaction
-      const pgClient = await pgPool.connect()
-      // mongo transaction
       const session = mongoClient.startSession()
 
-      try {
-        await pgClient.query('BEGIN')
-        await deductSealosBalance(vm.sealosUserUid, BigInt(vmFee.amount), pgClient)
+      let rollBackMongo: () => Promise<void>
 
+      const billingUuid = uuidv4()
+
+      try {
         session.startTransaction()
 
-        vm.phase = Phase.Created
+        vm.phase = Phase.Creating
         vm.state = State.Running
 
         const vmInsertResult = await db.collection<CloudVirtualMachine>('CloudVirtualMachine')
@@ -109,7 +110,7 @@ export class TencentVm {
           await db.collection<CloudVirtualMachineSubscription>('CloudVirtualMachineSubscription')
             .insertOne(cloudVirtualMachineSubscription, { session })
 
-
+        // 插入 账单表
         const cloudVirtualMachineBilling: CloudVirtualMachineBilling = {
           sealosUserId: vm.sealosUserId,
           sealosUserUid: vm.sealosUserUid,
@@ -142,15 +143,14 @@ export class TencentVm {
 
           state: CloudVirtualMachineBillingState.Done,
           chargeType: vm.chargeType,
-          subscriptionId: cloudVirtualMachineSubscriptionInsertResult.insertedId
+          subscriptionId: cloudVirtualMachineSubscriptionInsertResult.insertedId,
+          uuid: billingUuid
         }
 
         const cloudVirtualMachineBillingInsertResult = await db.collection<CloudVirtualMachineBilling>('CloudVirtualMachineBilling')
           .insertOne(cloudVirtualMachineBilling, { session })
 
-        await TencentVmOperation.create(vm.metaData)
-
-        const rollBackMongo = async () => {
+        rollBackMongo = async () => {
           await db.collection<CloudVirtualMachine>('CloudVirtualMachine')
             .deleteOne({ _id: vmInsertResult.insertedId })
           await db.collection<CloudVirtualMachineSubscription>('CloudVirtualMachineSubscription')
@@ -159,63 +159,20 @@ export class TencentVm {
             .deleteOne({ _id: cloudVirtualMachineBillingInsertResult.insertedId })
         }
 
-        try {
-          await session.commitTransaction()
-        } catch (MongoTransactionError) {
-          console.error("Error committing MongoDB transaction:", MongoTransactionError.stack)
-          await db.collection<ErrorLogs>('ErrorLogs').insertOne(
-            {
-              error: "Error committing MongoDB transaction",
-              createTime: new Date(),
-              errorMessage: MongoTransactionError.message,
-              errorDetails: MongoTransactionError.stack,
-              errorLevel: 'Fatal',
-              sealosUserId: vm.sealosUserId,
-              sealosUserUid: vm.sealosUserUid,
-              instanceName: vm.instanceName,
-              serviceName: "TencentVm.create"
-            }
-          )
-          throw MongoTransactionError  // 如果MongoDB事务提交失败，重新抛出错误
-        }
 
-        try {
-          await pgClient.query('COMMIT')
-        } catch (pgError) {
-          console.error("Error committing PostgreSQL transaction:", pgError.stack)
-          await rollBackMongo() // 处理MongoDB中的补偿逻辑
+        await session.commitTransaction()
 
-          await db.collection<ErrorLogs>('ErrorLogs').insertOne(
-            {
-              error: "Error committing PostgreSQL transaction",
-              createTime: new Date(),
-              errorMessage: pgError.message,
-              errorDetails: pgError.stack,
-              errorLevel: 'Fatal',
-              sealosUserId: vm.sealosUserId,
-              sealosUserUid: vm.sealosUserUid,
-              instanceName: vm.instanceName,
-              serviceName: "TencentVm.create"
-            }
-          )
+      } catch (MongoTransactionError) {
+        console.error("Error committing MongoDB transaction:", MongoTransactionError.stack)
 
-          await pgClient.query('ROLLBACK')
-
-          return
-        }
-
-      } catch (error) {
-
-        await pgClient.query('ROLLBACK')
         await session.abortTransaction()
 
-        console.error('Error executing deduct sealos balance transaction', error.stack)
         await db.collection<ErrorLogs>('ErrorLogs').insertOne(
           {
-            error: "Error TencentVm.create",
+            error: "Error committing MongoDB transaction",
             createTime: new Date(),
-            errorMessage: error.message,
-            errorDetails: error.stack,
+            errorMessage: MongoTransactionError.message,
+            errorDetails: MongoTransactionError.stack,
             errorLevel: 'Fatal',
             sealosUserId: vm.sealosUserId,
             sealosUserUid: vm.sealosUserUid,
@@ -223,19 +180,105 @@ export class TencentVm {
             serviceName: "TencentVm.create"
           }
         )
-        throw error
-      } finally {
-        pgClient.release()
-        await session.endSession()
+
+        throw MongoTransactionError
       }
 
-      return
+      // pg transaction
+      const pgClient = await pgPool.connect()
 
+      try {
+        await pgClient.query('BEGIN')
+
+        const deduction_balance = new Decimal(vmFee.amount).mul(CONSTANTS.RMB_TO_SEALOS).toNumber()
+
+        await deductSealosBalance(vm.sealosUserUid, BigInt(deduction_balance), pgClient)
+
+        const accountTransaction: AccountTransaction = {
+          type: AccountTransactionType.CloudVirtualMachine,
+          userUid: vm.sealosUserUid,
+          deduction_balance: BigInt(deduction_balance),
+          balance: BigInt(0),
+          message: AccountTransactionMessage.Tencent,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          billing_id: billingUuid
+        }
+
+        const addAccountTransaction: QueryConfig<string[]> = {
+          text: `
+          INSERT INTO "AccountTransaction" 
+          (type, userUid, deduction_balance, balance, message, created_at, updated_at, billing_id)
+          VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp, $6)
+          `,
+          values: [
+            accountTransaction.type,
+            accountTransaction.userUid,
+            accountTransaction.deduction_balance.toString(),
+            accountTransaction.balance.toString(),
+            accountTransaction.message,
+            accountTransaction.billing_id
+          ]
+        }
+
+        await pgClient.query(addAccountTransaction)
+
+        await pgClient.query('COMMIT')
+
+      } catch (pgError) {
+        console.error("Error committing PostgreSQL transaction:", pgError.stack)
+
+        try {
+          await rollBackMongo() // 处理MongoDB中的补偿逻辑
+        } catch (mongoRollBackError) {
+          console.error("Error rolling back MongoDB transaction:", mongoRollBackError.stack)
+
+          await db.collection<ErrorLogs>('ErrorLogs').insertOne(
+            {
+              error: "Error rolling back MongoDB transaction",
+              createTime: new Date(),
+              errorMessage: mongoRollBackError.message,
+              errorDetails: mongoRollBackError.stack,
+              errorLevel: 'Fatal',
+              sealosUserId: vm.sealosUserId,
+              sealosUserUid: vm.sealosUserUid,
+              instanceName: vm.instanceName,
+              serviceName: "TencentVm.create"
+            }
+          )
+
+        }
+
+        await pgClient.query('ROLLBACK')
+
+        await db.collection<ErrorLogs>('ErrorLogs').insertOne(
+          {
+            error: "Error committing PostgreSQL transaction",
+            createTime: new Date(),
+            errorMessage: pgError.message,
+            errorDetails: pgError.stack,
+            errorLevel: 'Fatal',
+            sealosUserId: vm.sealosUserId,
+            sealosUserUid: vm.sealosUserUid,
+            instanceName: vm.instanceName,
+            serviceName: "TencentVm.create"
+          }
+        )
+
+        throw pgError
+      }
+
+      await TencentVmOperation.create(vm.metaData)
+      console.info(`create ${vm.instanceName}`)
+
+      pgClient.release()
+      await session.endSession()
+
+      return
     }
 
     await db.collection<CloudVirtualMachine>('CloudVirtualMachine').insertOne(vm)
     return
-
   }
 
   // Todo findOneAndUpdate 设计思路文档补充
@@ -316,6 +359,7 @@ export class TencentVm {
     if (tencentVm.chargeType === ChargeType.PrePaid) {
       throw new Error('PrePaid instance can not be deleted')
     }
+
     const res = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine').findOneAndUpdate(
       {
         _id: tencentVm._id,

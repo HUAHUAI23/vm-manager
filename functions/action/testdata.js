@@ -1,10 +1,10 @@
+// 包年
 const params = {
     "InstanceChargeType": "PREPAID", // -
     "InstanceChargePrepaid": {
         "Period": 1,
         "RenewFlag": "NOTIFY_AND_MANUAL_RENEW" //- DISABLE_NOTIFY_AND_MANUAL_RENEW
     },
-
     "Placement": {
         "Zone": "ap-guangzhou-6",
         "ProjectId": 1311479
@@ -67,7 +67,7 @@ const params = {
     "DisableApiTermination": false
 }
 
-
+// 按量
 const params1 = {
     "InstanceChargeType": "POSTPAID_BY_HOUR",
     "Placement": {

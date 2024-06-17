@@ -32,7 +32,7 @@ export default async function (ctx: FunctionContext) {
                             architect: 'x86_64',
                         },
                     ],
-                    url: 'https://objectstorageapi.hzh.sealos.run/u2jbon3l-system-image/Ubuntu.svg',
+                    url: 'https://objectstorageapi.gzg.sealos.run/6dpazrhq-vm-manager/Ubuntu.svg',
                 },
                 debian: {
                     images: [
@@ -43,7 +43,7 @@ export default async function (ctx: FunctionContext) {
                             architect: 'x86_64',
                         },
                     ],
-                    url: 'https://objectstorageapi.hzh.sealos.run/u2jbon3l-system-image/Debian.svg',
+                    url: 'https://objectstorageapi.gzg.sealos.run/6dpazrhq-vm-manager/Debian.svg',
                 },
             }
             return { data: imgeList, error: null }

@@ -70,6 +70,8 @@ export default async function (ctx: FunctionContext) {
 
 
             const success = await TencentVm.delete(tencentVm)
+
+            // 可能由于其他服务 删除了虚拟机，导致删除失败，例如 欠费被删
             if (!success) {
                 throw new Error("Virtual state changed from Stopped to Deleted, document not found")
             }

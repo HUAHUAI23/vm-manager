@@ -12,7 +12,6 @@ export async function handlerStopEvents(vm: CloudVirtualMachine) {
     const vendorType: VmVendors = getVmVendor(vendor)
     switch (vendorType) {
         case VmVendors.Tencent:
-            console.log(222)
 
             const instanceDetails: Instance = await TencentVmOperation.getVmDetails(vm.instanceId)
 
@@ -21,7 +20,7 @@ export async function handlerStopEvents(vm: CloudVirtualMachine) {
             }
 
             if (instanceDetails.LatestOperation !== 'StopInstances' || instanceDetails.LatestOperationState === 'FAILED') {
-                console.log(333)
+                console.info(`stop ${vm.instanceName}`)
                 if (vm.chargeType === ChargeType.PostPaidByHour) {
                     await TencentVmOperation.stop(vm.instanceId)
                 }

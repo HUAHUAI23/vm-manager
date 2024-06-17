@@ -9,3 +9,4 @@ spec:
     tencentcloud-sdk-nodejs: 4.0.838
     pg: 8.11.5
     uuid: latest
+    "@types/pg": latest

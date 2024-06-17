@@ -200,7 +200,7 @@ async function createCloudVirtualMachineBilling(cloudVirtualMachine: CloudVirtua
     await session.abortTransaction()
     throw error
   } finally {
-    console.log('hello test')
+    console.info('billing session ok')
     await session.endSession()
   }
 }

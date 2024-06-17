@@ -4,6 +4,7 @@ import { pgPool } from './db'
 import { Decimal } from 'decimal.js'
 import { encrypt, deCrypt } from './crypto'
 import { PoolClient, QueryConfig } from 'pg'
+import CONSTANTS from './constants'
 
 type SealosAccount = {
     activityBonus: bigint
@@ -14,6 +15,26 @@ type SealosAccount = {
     balance: bigint
     deduction_balance: bigint
     userUid: string
+}
+
+export enum AccountTransactionType {
+    CloudVirtualMachine = 'CloudVirtualMachine'
+}
+
+export enum AccountTransactionMessage {
+    Tencent = 'tencent virtual machine subscription',
+}
+
+export type AccountTransaction = {
+    id?: string
+    type: AccountTransactionType
+    userUid: string
+    deduction_balance: bigint
+    balance: bigint
+    message: string
+    created_at: string
+    updated_at: string
+    billing_id: string
 }
 
 
@@ -164,8 +185,7 @@ export async function getSealosUserAccount(sealosUserUid: string) {
         const sealosAccount: SealosAccount = res.rows[0]
 
         const account = new Decimal(sealosAccount.balance.toString()).minus(sealosAccount.deduction_balance.toString())
-        const sealosUserAccountRMB = account.div(new Decimal('1000000'))
-        console.log(sealosUserAccountRMB.toNumber())
+        const sealosUserAccountRMB = account.div(new Decimal(CONSTANTS.RMB_TO_SEALOS))
 
         return sealosUserAccountRMB.toNumber()
 
@@ -243,7 +263,7 @@ export function sleep(ms: number): Promise<void> {
 }
 
 export const ReconcileStateJob = Cron("*/5 * * * * *", {
-    // name: "ReconcileStateJob",
+    name: "ReconcileStateJob",
     catch: true,
     paused: true,
     unref: true,                  // 允许进程在定时器运行时退出（Node.js 和 Deno 环境）
@@ -251,7 +271,7 @@ export const ReconcileStateJob = Cron("*/5 * * * * *", {
 })
 
 export const BillingJob = Cron("0 * * * * *", {
-    // name: "BillingJob",
+    name: "BillingJob",
     catch: true,
     paused: true,
     unref: true,                  // 允许进程在定时器运行时退出（Node.js 和 Deno 环境）

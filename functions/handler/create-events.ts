@@ -13,7 +13,6 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
 
     switch (vendorType) {
         case VmVendors.Tencent:
-            console.log(222)
             // if waiting time is more than 5 minutes, operation failed 
             const waitingTime = Date.now() - vm.updateTime.getTime()
 
@@ -41,8 +40,20 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
 
             const instance = instanceList[0]
 
+            if (!instance && vm.chargeType === ChargeType.PrePaid) {
+                await collection.updateOne(
+                    { _id: vm._id },
+                    {
+                        $set: {
+                            lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
+                        }
+                    }
+                )
+                return
+            }
+
             if (!instance && vm.chargeType === ChargeType.PostPaidByHour) {
-                console.log(333)
+                console.info(`create ${vm.instanceName}`)
                 await TencentVmOperation.create(vm.metaData)
                 // sleep
                 await sleep(CONSTANTS.SLEEP_TIME)
@@ -68,7 +79,6 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
                             lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME
                         }
                     })
-
                 return
             }
 

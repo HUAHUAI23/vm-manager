@@ -1,0 +1,5 @@
+name: action/sealos-account-merge
+desc: ""
+methods:
+  - POST
+tags: []
