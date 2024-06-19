@@ -33,6 +33,46 @@ interface IResponse {
   error: Error
 }
 
+function sortRegionDetail(regionDetail: RegionDetail): RegionDetail {
+  // 排序可用区
+  regionDetail.zone.sort((a, b) => a.zone.localeCompare(b.zone))
+
+  // 排序架构
+  regionDetail.zone.forEach(zoneDetail => {
+    zoneDetail.arch.sort((a, b) => {
+      if (a.arch === 'x86_64') return -1
+      if (b.arch === 'x86_64') return 1
+      return a.arch.localeCompare(b.arch)
+    })
+  })
+
+  // 排序虚拟机实例族
+  regionDetail.zone.forEach(zoneDetail => {
+    zoneDetail.arch.forEach(archDetail => {
+      archDetail.virtualMachineType.sort((a, b) => {
+        if (a.virtualMachineType === 'costEffective') return -1
+        if (b.virtualMachineType === 'costEffective') return 1
+        return a.virtualMachineType.localeCompare(b.virtualMachineType)
+      })
+    })
+  })
+
+  // 排序虚拟机机型
+  regionDetail.zone.forEach(zoneDetail => {
+    zoneDetail.arch.forEach(archDetail => {
+      archDetail.virtualMachineType.forEach(vmTypeDetail => {
+        vmTypeDetail.virtualMachinePackageFamily.sort((a, b) => {
+          if (a === 'highPerformance') return -1
+          if (b === 'highPerformance') return 1
+          return a.localeCompare(b)
+        })
+      })
+    })
+  })
+
+  return regionDetail
+}
+
 export default async function (ctx: FunctionContext) {
   const ok = verifyBearerToken(ctx.headers.authorization)
 
@@ -80,8 +120,10 @@ export default async function (ctx: FunctionContext) {
 
   }
 
-  regionList.push(postPaidByHourRegionDetail)
-  regionList.push(prePaidRegionDetail)
+  // sort
+
+  regionList.push(sortRegionDetail(prePaidRegionDetail))
+  regionList.push(sortRegionDetail(postPaidByHourRegionDetail))
 
   const data: IResponse = {
     data: regionList,
