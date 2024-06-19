@@ -20,10 +20,17 @@ async function createRegionAndZone() {
 
   const regionList: Region[] = [
     // gzg tencent
+    // {
+    //   name: 'gzg.sealos.run',
+    //   sealosRegionUid: '6a216614-e658-4482-a244-e4311390715f',
+    //   sealosRegionDomain: 'gzg.sealos.run',
+    //   cloudProvider: VmVendors.Tencent,
+    //   cloudProviderZone: ['ap-guangzhou-7']
+    // },
     {
-      name: 'gzg.sealos.run',
-      sealosRegionUid: '6a216614-e658-4482-a244-e4311390715f',
-      sealosRegionDomain: 'gzg.sealos.run',
+      name: '5.5',
+      sealosRegionUid: '97925cb0-c8e2-4d52-8b39-d8bf0cbb414a',
+      sealosRegionDomain: '5.5',
       cloudProvider: VmVendors.Tencent,
       cloudProviderZone: ['ap-guangzhou-7']
     },
@@ -35,7 +42,8 @@ async function createRegionAndZone() {
     session.startTransaction()
     await db.collection<Region>('Region').insertMany(regionList, { session })
     const gzg = await db.collection<Region>('Region').findOne(
-      { sealosRegionUid: '6a216614-e658-4482-a244-e4311390715f' },
+      // { sealosRegionUid: '6a216614-e658-4482-a244-e4311390715f' }, // gzg
+      { sealosRegionUid: '97925cb0-c8e2-4d52-8b39-d8bf0cbb414a' }, // 5.5
       { session })
 
     await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone').insertMany(
