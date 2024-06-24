@@ -38,4 +38,8 @@ export default class CONSTANTS {
     static get RMB_TO_SEALOS(): number {
         return 1000000
     }
+
+    static get SEALOS_ACCOUNT_MERGE_SECRET(): string {
+        return 'aaaaa'
+    }
 }
