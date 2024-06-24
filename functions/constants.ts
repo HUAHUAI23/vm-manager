@@ -40,6 +40,6 @@ export default class CONSTANTS {
     }
 
     static get SEALOS_ACCOUNT_MERGE_SECRET(): string {
-        return 'aaaaa'
+        return process.env.SEALOS_MERGE_SECRET
     }
 }

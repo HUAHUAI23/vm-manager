@@ -208,7 +208,7 @@ export class TencentVm {
         const addAccountTransaction: QueryConfig<string[]> = {
           text: `
           INSERT INTO "AccountTransaction" 
-          (type, userUid, deduction_balance, balance, message, created_at, updated_at, billing_id)
+          (type, "userUid", deduction_balance, balance, message, created_at, updated_at, billing_id)
           VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp, $6)
           `,
           values: [
