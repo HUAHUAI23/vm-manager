@@ -42,7 +42,7 @@ export default async function (ctx: FunctionContext) {
                 await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine')
                     .findOne({
                         instanceName: body.instanceName,
-                        sealosUserId: ok.sealosUserId,
+                        sealosUserUid: ok.sealosUserUid,
                         sealosRegionUid: ok.sealosRegionUid
                     })
 

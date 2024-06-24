@@ -47,14 +47,14 @@ export default async function (ctx: FunctionContext) {
             const total = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine')
                 .countDocuments({
                     cloudProvider: vendorType,
-                    sealosUserId: ok.sealosUserId,
+                    sealosUserUid: ok.sealosUserUid,
                     sealosRegionUid: ok.sealosRegionUid,
                 })
 
             const tencentMachineList = await db.collection<TencentCloudVirtualMachine>('CloudVirtualMachine')
                 .find({
                     cloudProvider: vendorType,
-                    sealosUserId: ok.sealosUserId,
+                    sealosUserUid: ok.sealosUserUid,
                     sealosRegionUid: ok.sealosRegionUid,
                 }).skip(
                     (body.page - 1) * body.pageSize
