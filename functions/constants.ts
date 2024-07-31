@@ -42,4 +42,12 @@ export default class CONSTANTS {
     static get SEALOS_ACCOUNT_MERGE_SECRET(): string {
         return process.env.SEALOS_MERGE_SECRET
     }
+
+    static get APP_ENV(): string {
+        return process.env.APP_ENV
+    }
+
+    static get IS_DEV(): boolean {
+        return process.env.APP_ENV === 'dev'
+    }
 }

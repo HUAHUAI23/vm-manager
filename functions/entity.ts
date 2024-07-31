@@ -53,7 +53,7 @@ export class CloudVirtualMachine<T = { [key: string]: any }> {
   phase: Phase
   state: State
 
-  // 后续去除 namespace
+  // TODO 后续去除 namespace sealosUserId
   // sealosNamespace: string
   sealosNamespace: string
   sealosUserId: string
@@ -97,15 +97,21 @@ export class CloudVirtualMachine<T = { [key: string]: any }> {
   createTime: Date
   // 状态变更时，该时间会发生变化
   updateTime: Date
+  // 状态变更时，锁时间，限制多实例下并发同时操作一个 VM
   lockedAt: Date
+  // 按量计费 上锁时间，限制多实例下并发同时操作一个 VM
   billingLockedAt: Date
+  // 最近一次 按量计费时间
   latestBillingTime: Date
+  // 欠费于
   oweAt?: Date
   metaData: T
 }
 
 export interface TencentMeta extends RunInstancesRequest { }
 
+// 重新声明 metaData 类型
+// 为兼容有些代码存在的 const vm:TencentCloudVirtualMachine 写法，新代码应用 const vm:CloudVirtualMachine<TencentMeta> 写法
 export class TencentCloudVirtualMachine extends CloudVirtualMachine {
   declare metaData: TencentMeta
 }
@@ -166,6 +172,7 @@ export class DiscountInfo {
   discountRate: number // 折扣率，如0.6表示6折
 }
 
+// 价格，按量 是每小时的价格，包年包月是每月的价格
 export class VirtualMachinePackage {
   _id?: ObjectId
   virtualMachinePackageFamilyId: ObjectId
@@ -264,6 +271,7 @@ export class ErrorLogs {
   errorMessage: string
   errorDetails: string
   errorLevel: 'Warning' | 'Error' | 'Fatal'
+  // TODO  后续去除 sealosUserId
   sealosUserId: string
   sealosUserUid: string
   instanceName: string

@@ -31,9 +31,9 @@ const client = new CvmClient({
 export class TencentVmOperation {
     private static client = client
 
-    static async create(params: RunInstancesRequest): Promise<string> {
+    static async create(params: RunInstancesRequest, instanceName: string): Promise<string> {
         const res = await client.RunInstances(params)
-        console.info('tencent sdk create:\n', JSON.stringify(res, null, 2))
+        console.info(`tencent sdk create ${instanceName}:\n`, JSON.stringify(res, null, 2))
         const instanceId = res.InstanceIdSet?.[0]
         return instanceId
     }

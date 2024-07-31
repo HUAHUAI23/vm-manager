@@ -16,6 +16,7 @@ interface IRequestBody {
 
     chargeType: ChargeType
     period?: number
+    counts?: number
 
     imageId: string
     systemDisk: number
@@ -36,6 +37,7 @@ const iRequestBodySchema: Schema = {
     virtualMachinePackageName: (value) => typeof value === 'string',
     chargeType: (value) => Object.values(ChargeType).includes(value),
     period: { optional: true, validate: (value) => typeof value === 'number' },
+    counts: { optional: true, validate: (value) => Number.isInteger(value) && value !== 0 },
     imageId: (value) => typeof value === 'string',
     systemDisk: (value) => typeof value === 'number',
     dataDisks: (value) => Array.isArray(value) && value.every(v => typeof v === 'number'),
@@ -138,7 +140,9 @@ export default async function (ctx: FunctionContext) {
 
     const sealosAccountRMB = await getSealosUserAccount(ok.sealosUserUid)
 
-    if (sealosAccountRMB < cloudVirtualMachineFee) {
+    const counts = body.counts && body.counts > 1 ? body.counts : 1
+
+    if (sealosAccountRMB < cloudVirtualMachineFee * counts) {
         return { data: null, error: 'Insufficient balance' }
     }
 
@@ -147,16 +151,6 @@ export default async function (ctx: FunctionContext) {
     const vendorType: VmVendors = getVmVendor(region.cloudProvider)
     switch (vendorType) {
         case VmVendors.Tencent:
-            const gen = nanoid.customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 7)
-            const instanceName = gen()
-
-            const find = await db.collection<CloudVirtualMachine<TencentMeta>>('CloudVirtualMachine').findOne({ instanceName: instanceName })
-
-            if (find) {
-                throw new Error(`The virtual machine with the instanceName ${instanceName} already exists.`)
-            }
-
-
             const instanceConfigInfo = await
                 TencentVmOperation.describeZoneInstanceConfigInfo(cloudVirtualMachineZone.cloudProviderZone,
                     virtualMachinePackageFamily.cloudProviderVirtualMachinePackageFamily,
@@ -167,134 +161,168 @@ export default async function (ctx: FunctionContext) {
                 return { data: null, error: 'sold out' }
             }
 
+            const gen = nanoid.customAlphabet('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ', 7)
 
-            const tencentCloudVirtualMachine: CloudVirtualMachine<TencentMeta> = {
-                phase: Phase.Creating,
-                state: State.Running,
+            const createInstance = async (instanceName: string): Promise<String> => {
+                const find = await db.collection<CloudVirtualMachine<TencentMeta>>('CloudVirtualMachine')
+                    .findOne({ instanceName: instanceName })
 
-                sealosNamespace: ok.sealosNamespace,
-                sealosUserId: ok.sealosUserId,
-                sealosUserUid: ok.sealosUserUid,
-                sealosRegionUid: region.sealosRegionUid,
-                sealosRegionDomain: region.sealosRegionDomain,
+                if (find) {
+                    throw new Error(`The virtual machine with the instanceName ${instanceName} already exists.`)
+                }
 
-                zoneName: cloudVirtualMachineZone.name,
-                zoneId: cloudVirtualMachineZone._id,
-                region: region.name,
+                const tencentCloudVirtualMachine: CloudVirtualMachine<TencentMeta> = {
+                    phase: Phase.Creating,
+                    state: State.Running,
 
-                cpu: instanceConfigInfo.Cpu,
-                memory: instanceConfigInfo.Memory,
-                gpu: instanceConfigInfo.Gpu,
-                disk: diskSize,
+                    sealosNamespace: ok.sealosNamespace,
+                    sealosUserId: ok.sealosUserId,
+                    sealosUserUid: ok.sealosUserUid,
+                    sealosRegionUid: region.sealosRegionUid,
+                    sealosRegionDomain: region.sealosRegionDomain,
 
-                publicNetworkAccess: body.internetMaxBandwidthOut > 0,
-                internetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
+                    zoneName: cloudVirtualMachineZone.name,
+                    zoneId: cloudVirtualMachineZone._id,
+                    region: region.name,
 
-                instanceName: instanceName,
-                imageId: body.imageId,
+                    cpu: instanceConfigInfo.Cpu,
+                    memory: instanceConfigInfo.Memory,
+                    gpu: instanceConfigInfo.Gpu,
+                    disk: diskSize,
 
-                loginPassword: body.loginPassword,
+                    publicNetworkAccess: body.internetMaxBandwidthOut > 0,
+                    internetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
 
-                cloudProvider: VmVendors.Tencent,
-                cloudProviderZone: cloudVirtualMachineZone.cloudProviderZone,
+                    instanceName: instanceName,
+                    imageId: body.imageId,
 
-                virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
-                virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
+                    loginPassword: body.loginPassword,
 
-                chargeType: virtualMachinePackage.chargeType,
+                    cloudProvider: VmVendors.Tencent,
+                    cloudProviderZone: cloudVirtualMachineZone.cloudProviderZone,
 
-                createTime: new Date(),
-                updateTime: new Date(),
-                lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,
-                billingLockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,
-                latestBillingTime: CONSTANTS.TASK_LOCK_INIT_TIME,
+                    virtualMachinePackageFamilyId: virtualMachinePackageFamily._id,
+                    virtualMachinePackageName: virtualMachinePackage.virtualMachinePackageName,
 
-                metaData: {
-                    InstanceChargeType: chargeType === ChargeType.PostPaidByHour ? 'POSTPAID_BY_HOUR' : "PREPAID",
-                    Placement: {
-                        Zone: cloudVirtualMachineZone.cloudProviderZone,
-                        ProjectId: 1311479,
-                    },
-                    InstanceType: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
-                    ImageId: body.imageId,
-                    SystemDisk: {
+                    chargeType: virtualMachinePackage.chargeType,
+
+                    createTime: new Date(),
+                    updateTime: new Date(),
+                    lockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,
+                    billingLockedAt: CONSTANTS.TASK_LOCK_INIT_TIME,
+                    latestBillingTime: CONSTANTS.TASK_LOCK_INIT_TIME,
+
+                    metaData: {
+                        InstanceChargeType: chargeType === ChargeType.PostPaidByHour ? 'POSTPAID_BY_HOUR' : "PREPAID",
+                        Placement: {
+                            Zone: cloudVirtualMachineZone.cloudProviderZone,
+                            ProjectId: 1311479,
+                        },
+                        InstanceType: virtualMachinePackage.cloudProviderVirtualMachinePackageName,
+                        ImageId: body.imageId,
+                        SystemDisk: {
+                            DiskType: "CLOUD_BSSD",
+                            DiskSize: body.systemDisk
+                        },
+                        VirtualPrivateCloud: {
+                            VpcId: 'vpc-oin9dr9h',
+                            SubnetId: 'subnet-643z86ds'
+                        },
+                        InternetAccessible: {
+                            InternetChargeType: chargeType === ChargeType.PostPaidByHour ? "BANDWIDTH_POSTPAID_BY_HOUR" : "BANDWIDTH_PREPAID",
+                            InternetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
+                            PublicIpAssigned: body.internetMaxBandwidthOut > 0
+                        },
+                        InstanceCount: 1,
+                        InstanceName: instanceName,
+                        LoginSettings: {
+                            Password: body.loginPassword
+                        },
+                        SecurityGroupIds: [
+                            "sg-jvxnr55b"
+                        ],
+                        EnhancedService: {
+                            SecurityService: {
+                                Enabled: true
+                            },
+                            MonitorService: {
+                                Enabled: true
+                            },
+                            AutomationService: {
+                                Enabled: true
+                            }
+                        },
+                        ClientToken: uuidv4(),
+                        TagSpecification: [
+                            {
+                                ResourceType: "instance",
+                                Tags: [
+                                    {
+                                        Key: "sealos-user",
+                                        Value: ok.sealosUserId
+                                    }
+                                ]
+                            }
+
+                        ],
+                        DisableApiTermination: false,
+                        UserData: 'IyEvYmluL2Jhc2gKc2V0IC1ldXhvIHBpcGVmYWlsCmlmIFtbICRFVUlEIC1uZSAwIF1dOyB0aGVuCiAgIGVjaG8gIlRoaXMgc2NyaXB0IG11c3QgYmUgcnVuIGFzIHJvb3QiIAogICBleGl0IDEKZmkKUkVTT0xWRV9ESVI9L2V0Yy9zeXN0ZW1kL3Jlc29sdmVkLmNvbmYuZApSRVNPTFZFX0ZJTEU9c2VhbG9zLWNvcmVkbnMuY29uZgplY2hvICJTZXR0aW5nIHVwIEROUyBzZXJ2ZXIuLi4iCm1rZGlyIC1wICR7UkVTT0xWRV9ESVJ9CmVjaG8gIltSZXNvbHZlXSIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkROUz0xMC45Ni4wLjEwIiA+PiAke1JFU09MVkVfRElSfS8ke1JFU09MVkVfRklMRX0KZWNobyAiRG9tYWlucz1+LiIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkZhbGxiYWNrRE5TPTE4My42MC44My4xOSIgPj4gJHtSRVNPTFZFX0ZJTEV9CnN5c3RlbWN0bCByZXN0YXJ0IHN5c3RlbWQtcmVzb2x2ZWQKZWNobyAiRE5TIHNlcnZlciBzZXR1cCBjb21wbGV0ZS4i'
+                    }
+                }
+
+                if (body?.dataDisks[0]) {
+
+                    tencentCloudVirtualMachine.metaData.DataDisks = body.dataDisks.map((size) => ({
                         DiskType: "CLOUD_BSSD",
-                        DiskSize: body.systemDisk
-                    },
-                    VirtualPrivateCloud: {
-                        VpcId: 'vpc-oin9dr9h',
-                        SubnetId: 'subnet-643z86ds'
-                    },
-                    InternetAccessible: {
-                        InternetChargeType: chargeType === ChargeType.PostPaidByHour ? "BANDWIDTH_POSTPAID_BY_HOUR" : "BANDWIDTH_PREPAID",
-                        InternetMaxBandwidthOut: body.internetMaxBandwidthOut > 0 ? body.internetMaxBandwidthOut : 0,
-                        PublicIpAssigned: body.internetMaxBandwidthOut > 0
-                    },
-                    InstanceCount: 1,
-                    InstanceName: instanceName,
-                    LoginSettings: {
-                        Password: body.loginPassword
-                    },
-                    SecurityGroupIds: [
-                        "sg-jvxnr55b"
-                    ],
-                    EnhancedService: {
-                        SecurityService: {
-                            Enabled: true
-                        },
-                        MonitorService: {
-                            Enabled: true
-                        },
-                        AutomationService: {
-                            Enabled: true
-                        }
-                    },
-                    ClientToken: uuidv4(),
-                    TagSpecification: [
-                        {
-                            ResourceType: "instance",
-                            Tags: [
-                                {
-                                    Key: "sealos-user",
-                                    Value: ok.sealosUserId
-                                }
-                            ]
-                        }
-
-                    ],
-                    DisableApiTermination: false,
-                    UserData: 'IyEvYmluL2Jhc2gKc2V0IC1ldXhvIHBpcGVmYWlsCmlmIFtbICRFVUlEIC1uZSAwIF1dOyB0aGVuCiAgIGVjaG8gIlRoaXMgc2NyaXB0IG11c3QgYmUgcnVuIGFzIHJvb3QiIAogICBleGl0IDEKZmkKUkVTT0xWRV9ESVI9L2V0Yy9zeXN0ZW1kL3Jlc29sdmVkLmNvbmYuZApSRVNPTFZFX0ZJTEU9c2VhbG9zLWNvcmVkbnMuY29uZgplY2hvICJTZXR0aW5nIHVwIEROUyBzZXJ2ZXIuLi4iCm1rZGlyIC1wICR7UkVTT0xWRV9ESVJ9CmVjaG8gIltSZXNvbHZlXSIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkROUz0xMC45Ni4wLjEwIiA+PiAke1JFU09MVkVfRElSfS8ke1JFU09MVkVfRklMRX0KZWNobyAiRG9tYWlucz1+LiIgPj4gJHtSRVNPTFZFX0RJUn0vJHtSRVNPTFZFX0ZJTEV9CmVjaG8gIkZhbGxiYWNrRE5TPTE4My42MC44My4xOSIgPj4gJHtSRVNPTFZFX0ZJTEV9CnN5c3RlbWN0bCByZXN0YXJ0IHN5c3RlbWQtcmVzb2x2ZWQKZWNobyAiRE5TIHNlcnZlciBzZXR1cCBjb21wbGV0ZS4i'
+                        DiskSize: size,
+                        DeleteWithInstance: true,
+                    }))
                 }
-            }
 
-            if (body?.dataDisks[0]) {
+                if (chargeType === ChargeType.PrePaid) {
 
-                tencentCloudVirtualMachine.metaData.DataDisks = body.dataDisks.map((size) => ({
-                    DiskType: "CLOUD_BSSD",
-                    DiskSize: size,
-                    DeleteWithInstance: true,
-                }))
-            }
-
-            if (chargeType === ChargeType.PrePaid) {
-
-                tencentCloudVirtualMachine.metaData.InstanceChargePrepaid = {
-                    Period: period,
-                    RenewFlag: "NOTIFY_AND_MANUAL_RENEW"
+                    tencentCloudVirtualMachine.metaData.InstanceChargePrepaid = {
+                        Period: period,
+                        RenewFlag: "NOTIFY_AND_MANUAL_RENEW"
+                    }
                 }
+
+                tencentCloudVirtualMachine.metaData.DryRun = false
+
+                // test
+                if (CONSTANTS.IS_DEV && chargeType === ChargeType.PrePaid) {
+                    tencentCloudVirtualMachine.metaData.DryRun = true
+                }
+
+                try {
+                    await TencentVm.create(tencentCloudVirtualMachine, period)
+                } catch (error) {
+                    console.error('create vm error', error.stack)
+                    throw new Error(`create vm ${tencentCloudVirtualMachine.instanceName} error`)
+                }
+
+                return tencentCloudVirtualMachine.instanceName
             }
 
-            // test
-            tencentCloudVirtualMachine.metaData.DryRun = true
+            const instanceNames = []
+            const counts = body.counts && body.counts > 1 ? body.counts : 1
 
-            try {
-                await TencentVm.create(tencentCloudVirtualMachine, period)
-            } catch (error) {
-                console.error('create vm error', error.stack)
-                return { data: null, error: `create vm ${tencentCloudVirtualMachine.instanceName} error` }
+            for (let i = 0; i < counts; i++) {
+                const instanceName = gen()
+                let result: String
+
+                try {
+                    result = await createInstance(instanceName)
+                } catch (error) {
+                    console.error('create vm error', error)
+                    console.error('create vm error', error.stack)
+                    return { data: null, error: `Failed to create the ${i} virtual machine, vm: ${instanceName}` }
+                }
+
+                instanceNames.push(result)
             }
 
-            return { data: tencentCloudVirtualMachine.instanceName, error: null }
+            return { data: instanceNames, error: null }
 
         default:
             throw new Error(`Unsupported Vendor type: ${vendorType}`)

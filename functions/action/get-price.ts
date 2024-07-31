@@ -13,6 +13,7 @@ interface IRequestBody {
 
   chargeType: ChargeType
   period?: number
+  counts?: number
 
   imageId: string
   systemDisk: number
@@ -39,6 +40,7 @@ const iRequestBodySchema: Schema = {
   virtualMachinePackageName: (value) => typeof value === 'string',
   chargeType: (value) => Object.values(ChargeType).includes(value),
   period: { optional: true, validate: (value) => typeof value === 'number' },
+  counts: { optional: true, validate: (value) => Number.isInteger(value) && value !== 0 },
   imageId: (value) => typeof value === 'string',
   systemDisk: (value) => typeof value === 'number',
   dataDisks: (value) => Array.isArray(value) && value.every(v => typeof v === 'number'),
@@ -139,14 +141,15 @@ export default async function (ctx: FunctionContext) {
   //   }
   // }
 
+  const counts = body.counts && body.counts > 1 ? body.counts : 1
+
   const instancePrice = new Decimal(virtualMachinePackage.instancePrice).
-    mul(new Decimal(period))
+    mul(new Decimal(period)).mul(counts)
 
   // 计算硬盘价格
   const diskPrice = diskSize.mul(new Decimal(virtualMachinePackage.diskPerG))
-    .mul(new Decimal(period))
+    .mul(new Decimal(period)).mul(counts)
 
-  let networkPrice = new Decimal(0)
 
   const networkPricePerMbps = getPriceForBandwidth(virtualMachinePackage, body.internetMaxBandwidthOut)
 
@@ -155,10 +158,10 @@ export default async function (ctx: FunctionContext) {
   }
 
   // 根据带宽计算网络价格
-  networkPrice =
+  const networkPrice =
     new Decimal(networkPricePerMbps)
       .mul(new Decimal(body.internetMaxBandwidthOut))
-      .mul(new Decimal(period))
+      .mul(new Decimal(period)).mul(counts)
 
   // 将 Decimal 对象转换为数字类型
   price.diskPrice = diskPrice.toNumber()

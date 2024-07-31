@@ -54,7 +54,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
 
             if (!instance && vm.chargeType === ChargeType.PostPaidByHour) {
                 console.info(`create ${vm.instanceName}`)
-                await TencentVmOperation.create(vm.metaData)
+                await TencentVmOperation.create(vm.metaData, vm.instanceName)
                 // sleep
                 await sleep(CONSTANTS.SLEEP_TIME)
                 await collection.updateOne(

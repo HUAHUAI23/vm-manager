@@ -5,7 +5,7 @@ import { BillingJob, getSealosUserAccount } from './utils'
 import { Decimal } from 'decimal.js'
 import CONSTANTS from './constants'
 
-// todo 添加欠费删除与欠费关机逻辑 欠费标识，欠费标识未添加，欠费关机逻辑已经添加
+// TODO 添加欠费删除与欠费关机逻辑 欠费标识，欠费标识未添加，欠费关机逻辑已经添加
 
 async function tick() {
   await handleCloudVirtualMachineBillingCreating()

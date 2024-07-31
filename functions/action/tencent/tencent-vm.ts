@@ -268,11 +268,11 @@ export class TencentVm {
         throw pgError
       }
 
-      await TencentVmOperation.create(vm.metaData)
-      console.info(`create ${vm.instanceName}`)
-
       pgClient.release()
       await session.endSession()
+
+      await TencentVmOperation.create(vm.metaData, vm.instanceName)
+      console.info(`create ${vm.instanceName}`)
 
       return
     }
