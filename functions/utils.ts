@@ -193,7 +193,6 @@ export async function getSealosUserAccount(sealosUserUid: string) {
 
         const sealosUserAccountRMB = account.div(new Decimal(CONSTANTS.RMB_TO_SEALOS))
 
-        console.log(sealosUserAccountRMB.toNumber())
         return sealosUserAccountRMB.toNumber()
 
     } catch (error) {

@@ -9,7 +9,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
     const collection = db.collection<CloudVirtualMachine>('CloudVirtualMachine')
     const vendor = vm.cloudProvider
     const vendorType: VmVendors = getVmVendor(vendor)
-    // todo 设置锁，解决多实例下    await TencentVmOperation.create(vm.metaData) 并发请求问题 已经解决了
+    // TODO 设置锁，解决多实例下    await TencentVmOperation.create(vm.metaData) 并发请求问题 已经解决了
 
     switch (vendorType) {
         case VmVendors.Tencent:
@@ -40,6 +40,7 @@ export async function handlerCreateEvents(vm: CloudVirtualMachine) {
 
             const instance = instanceList[0]
 
+            // 包年包月机子 创建 需要等待一段时间才会有 instance
             if (!instance && vm.chargeType === ChargeType.PrePaid) {
                 await collection.updateOne(
                     { _id: vm._id },
