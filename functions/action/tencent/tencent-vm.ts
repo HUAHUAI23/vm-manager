@@ -3,7 +3,7 @@ import { client as mongoClient } from '../../db'
 import { State, CloudVirtualMachine, Phase, TencentCloudVirtualMachine, ChargeType, VirtualMachinePackage, CloudVirtualMachineSubscription, CloudVirtualMachineBilling, CloudVirtualMachineBillingState, VirtualMachinePackageFamily, RenewalPlan, SubscriptionState, ErrorLogs } from "../../entity"
 import { TencentVmOperation } from "@/sdk/tencent/tencent-sdk"
 import { pgPool } from '../../db'
-import { AccountTransaction, AccountTransactionMessage, AccountTransactionType, deductSealosBalance, validationEncrypt } from '@/utils'
+import { AccountTransaction, AccountTransactionMessage, AccountTransactionType, deductSealosBalance } from '@/utils'
 import { getCloudVirtualMachineFee } from '@/billing-task'
 import { v4 as uuidv4 } from 'uuid'
 import { QueryConfig } from 'pg'
@@ -47,12 +47,6 @@ export class TencentVm {
         vm.disk,
         period
       )
-
-      const ok = await validationEncrypt(vm.sealosUserUid)
-
-      if (!ok) {
-        throw new Error('sealos account validate encrypt failed')
-      }
 
       const session = mongoClient.startSession()
 

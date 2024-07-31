@@ -2,7 +2,7 @@ import cloud from '@lafjs/cloud'
 import { Cron } from "croner"
 import { pgPool } from './db'
 import { Decimal } from 'decimal.js'
-import { encrypt, deCrypt } from './crypto'
+import { encrypt } from './crypto'
 import { PoolClient, QueryConfig } from 'pg'
 import CONSTANTS from './constants'
 
@@ -184,9 +184,16 @@ export async function getSealosUserAccount(sealosUserUid: string) {
 
         const sealosAccount: SealosAccount = res.rows[0]
 
-        const account = new Decimal(sealosAccount.balance.toString()).minus(sealosAccount.deduction_balance.toString())
+        const account = new Decimal(sealosAccount.balance.toString())
+            .minus(
+                new Decimal(
+                    sealosAccount.deduction_balance.toString()
+                )
+            )
+
         const sealosUserAccountRMB = account.div(new Decimal(CONSTANTS.RMB_TO_SEALOS))
 
+        console.log(sealosUserAccountRMB.toNumber())
         return sealosUserAccountRMB.toNumber()
 
     } catch (error) {
@@ -194,38 +201,6 @@ export async function getSealosUserAccount(sealosUserUid: string) {
         throw error
     }
 
-}
-
-export async function validationEncrypt(sealosUserUid: string): Promise<boolean> {
-
-    const query: QueryConfig<string[]> = {
-        text: 'SELECT * FROM "Account" WHERE "userUid" = $1',
-        values: [sealosUserUid],  // 将userUid作为参数传递给查询
-    }
-
-    try {
-        const res = await pgPool.query(query)
-
-        if (res.rows.length === 0) {
-            throw new Error('No account found with the given userUid.')
-        }
-
-        if (res.rows.length > 1) {
-            throw new Error('Multiple accounts found with the given userUid.')
-        }
-
-        const sealosAccount: SealosAccount = res.rows[0]
-
-        if (deCrypt(sealosAccount.encryptDeductionBalance) !== sealosAccount.deduction_balance.toString()) {
-            return false
-        }
-
-        return true
-
-    } catch (error) {
-        console.error('validate encrypt failed', error.stack)
-        throw error
-    }
 }
 
 export async function deductSealosBalance(sealosUserUid: string, deductionAmount: bigint, client: PoolClient) {
