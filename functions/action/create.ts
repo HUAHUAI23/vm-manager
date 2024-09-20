@@ -1,6 +1,6 @@
 import { VmVendors, isValueInEnum, getVmVendor } from '../type'
 import { Arch, ChargeType, CloudVirtualMachine, CloudVirtualMachineZone, Phase, Region, State, TencentMeta, VirtualMachinePackage, VirtualMachinePackageFamily, VirtualMachineType } from '../entity'
-import { Schema, getSealosUserAccount, validateDTO, validatePeriod, verifyBearerToken } from '../utils'
+import { Schema, getSealosUserAccount, validateDTO, validatePeriod, validateSealosUserRealNameInfo, verifyBearerToken } from '../utils'
 import { TencentVmOperation } from '../sdk/tencent/tencent-sdk'
 import { TencentVm } from './tencent/tencent-vm'
 import { db } from '../db'
@@ -53,6 +53,12 @@ export default async function (ctx: FunctionContext) {
     const ok = verifyBearerToken(ctx.headers.authorization)
     if (!ok) {
         return { data: null, error: 'Unauthorized' }
+    }
+
+    const isRealName = await validateSealosUserRealNameInfo(ok.sealosUserUid)
+
+    if (!isRealName) {
+        return { data: null, error: 'create cloud virtual machine need real name auth' }
     }
 
     const body: IRequestBody = ctx.request.body

@@ -1,10 +1,10 @@
 import cloud from '@lafjs/cloud'
 import { Cron } from "croner"
-import { pgPool } from './db'
+import { db, pgPool } from './db'
 import { Decimal } from 'decimal.js'
-import { encrypt } from './crypto'
 import { PoolClient, QueryConfig } from 'pg'
 import CONSTANTS from './constants'
+import { CloudVirtualMachineSubscription } from './entity'
 
 type SealosAccount = {
     activityBonus: bigint
@@ -35,6 +35,19 @@ export type AccountTransaction = {
     created_at: string
     updated_at: string
     billing_id: string
+}
+
+type UserRealNameInfo = {
+    id: string
+    userUid: string
+    realName?: string
+    idCard?: string
+    phone?: string
+    isVerified: boolean
+    idVerifyFailedTimes: number
+    createdAt: string
+    updatedAt: string
+    additionalInfo?: object
 }
 
 
@@ -204,24 +217,28 @@ export async function getSealosUserAccount(sealosUserUid: string) {
 
 export async function deductSealosBalance(sealosUserUid: string, deductionAmount: bigint, client: PoolClient) {
 
-    const query: QueryConfig<string[]> = {
-        text: 'SELECT * FROM "Account" WHERE "userUid" = $1',
+    // set update lock on the account avoiding concurrent update
+    const selectForUpdateQuery: QueryConfig<string[]> = {
+        text: 'SELECT * FROM "Account" WHERE "userUid" = $1 FOR UPDATE',
         values: [sealosUserUid],  // 将userUid作为参数传递给查询
     }
 
 
+
     try {
-        const res = await client.query(query)
+        const res = await client.query(selectForUpdateQuery)
+
+        if (res.rows.length === 0) {
+            throw new Error('Account not found')
+        }
 
         const account: SealosAccount = res.rows[0]
 
         const newDeductionBalance = BigInt(deductionAmount) + BigInt(account.deduction_balance)
 
-        const newEncryptedDeductionBalance = encrypt(newDeductionBalance.toString())
-
         const updateQuery: QueryConfig<string[]> = {
-            text: 'UPDATE "Account" SET "deduction_balance" = $1, "encryptDeductionBalance" = $2 WHERE "userUid" = $3',
-            values: [newDeductionBalance.toString(), newEncryptedDeductionBalance, sealosUserUid],
+            text: 'UPDATE "Account" SET "deduction_balance" = $1 WHERE "userUid" = $2',
+            values: [newDeductionBalance.toString(), sealosUserUid],
         }
 
         await client.query(updateQuery)
@@ -230,6 +247,49 @@ export async function deductSealosBalance(sealosUserUid: string, deductionAmount
         throw error
     }
 
+}
+
+export async function validateSealosUserRealNameInfo(sealosUserUid: string): Promise<boolean> {
+    const query: QueryConfig<string[]> = {
+        text: 'SELECT * FROM "UserRealNameInfo" WHERE "userUid" = $1',
+        values: [sealosUserUid],
+    }
+
+    try {
+        const res = await pgPool.query(query)
+
+        if (res.rows.length === 0) {
+            return false
+        }
+
+        const userRealNameInfo: UserRealNameInfo = res.rows[0]
+
+        return userRealNameInfo.isVerified
+    } catch (error) {
+        console.error('Error executing query', error.stack)
+        throw error
+    }
+}
+
+export async function isSubscriptionExpired(instanceName: string): Promise<boolean> {
+    try {
+        const subscriptions = await db.collection<CloudVirtualMachineSubscription>('CloudVirtualMachineSubscription')
+            .find({ instanceName })
+            .sort({ expireTime: -1 })
+            .toArray()
+
+        if (subscriptions.length === 0) {
+            return true
+        }
+
+        const latestSubscription = subscriptions[0]
+        const currentTime = new Date()
+
+        return latestSubscription.expireTime <= currentTime
+    } catch (error) {
+        console.error('Error checking subscription expiration', error.stack)
+        throw error
+    }
 }
 
 export function sleep(ms: number): Promise<void> {

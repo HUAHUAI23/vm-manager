@@ -1,5 +1,5 @@
 import { VmVendors, getVmVendor } from '../type'
-import { getSealosUserAccount, validateDTO, verifyBearerToken } from '../utils'
+import { getSealosUserAccount, isSubscriptionExpired, validateDTO, verifyBearerToken } from '../utils'
 import { ChargeType, CloudVirtualMachineZone, IntermediatePhases, IntermediateStates, Phase, Region, TencentCloudVirtualMachine, VirtualMachinePackage, VirtualMachinePackageFamily } from '../entity'
 import { db } from '../db'
 import { TencentVm } from './tencent/tencent-vm'
@@ -48,6 +48,12 @@ export default async function (ctx: FunctionContext) {
 
             if (!tencentVm) {
                 return { data: null, error: 'Virtual Machine not found' }
+            }
+
+            if (tencentVm.chargeType === ChargeType.PrePaid) {
+                if (isSubscriptionExpired(tencentVm.instanceName)) {
+                    return { data: null, error: 'Subscription expired' }
+                }
             }
 
             const cloudVirtualMachineZone = await db.collection<CloudVirtualMachineZone>('CloudVirtualMachineZone')
